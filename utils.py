@@ -262,10 +262,10 @@ def do_langevin(initial_path, images, G, steps):
 
     sigma = 0.5
 
-    kappa_2 = 9*1e2
-    alpha = 6*1e2
+    kappa_2 = 9*1e2*0
+    alpha = 6*1e2*0
     beta = 1.0
-    h = 0.001
+    h = 0.0001
 
     n_models = initial_path.shape[0]
 
@@ -277,8 +277,11 @@ def do_langevin(initial_path, images, G, steps):
     old_path = initial_path.copy()
     old_prob_mat = post_prob(old_path, images, sigma)
     old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+    old_neg_post = neglogpost_cryobife(free_energy, kappa_2, old_prob_mat)
 
-    mala_num = -np.inf
+    old_der = models_der(old_path)
+    old_dist = models_dist(old_path)
+
     for step in range(steps):
 
         new_path = old_path.copy()
@@ -305,38 +308,54 @@ def do_langevin(initial_path, images, G, steps):
         new_path[model_index, coord_index] += -h * old_gradient[model_index, coord_index] + np.sqrt(2 * h) * xi
 
         # Not sure what these are for
+        mala_den = old_neg_post - np.sum((new_path - old_path + h * old_gradient)**2 / (4*h), axis=1) - kappa_2 * old_dist - alpha * old_der
 
-        der = models_der(new_path)
-        dist = models_dist(new_path)
+        new_prob_mat = post_prob(new_path, images, sigma)
+        new_neg_post = neglogpost_cryobife(free_energy, kappa_2, new_prob_mat)
+        new_gradient = gradient_cryo_bife(new_path, free_energy, images, new_prob_mat, sigma)
+
+        # Not sure what these are for
+        new_der = models_der(new_path)
+        new_dist = models_dist(new_path)
         
         # !TODO ask Julian where did this come from
-        mala_den = -new_log_post - np.sum( (new_path - old_path + h * old_gradient)**2 ) - kappa_2 * dist - alpha * der
+        mala_num = new_neg_post - np.sum((old_path - new_path + h * new_gradient)**2 / (4*h), axis=1) - kappa_2 * new_dist - alpha * new_der
 
         aa = 0
         rr = np.log(np.random.random())
 
-        if (mala_den > mala_num):
+        if (mala_den[model_index] > mala_num[model_index]):
 
             aa += 1
 
             # Update old variables
             old_path = new_path.copy()
-            mala_num = mala_den
             
-            old_prob_mat = post_prob(old_path, images, sigma)
-            old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+            old_prob_mat = new_prob_mat.copy()
+            old_gradient = new_gradient.copy()
+            old_neg_post = new_neg_post
 
-        elif (rr < -(mala_num - mala_den) * beta):
+            old_dist = new_dist
+            old_der = new_der
+
+        elif (rr < -(mala_num[model_index] - mala_den[model_index]) * beta):
 
             # why?
             aa += 2
 
             # Update old variables
             old_path = new_path.copy()
-            mala_num = mala_den
             
             old_prob_mat = post_prob(old_path, images, sigma)
             old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+
+            old_prob_mat = new_prob_mat.copy()
+            old_gradient = new_gradient.copy()
+            old_neg_post = new_neg_post
+
+            old_dist = new_dist
+            old_der = new_der
+
 
         else:
 
