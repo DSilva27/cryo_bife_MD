@@ -262,8 +262,8 @@ def do_langevin(initial_path, images, G, steps):
 
     sigma = 0.5
 
-    kappa_2 = 9*1e2*0
-    alpha = 6*1e2*0
+    kappa_2 = 9*1e2
+    alpha = 6*1e2
     beta = 1.0
     h = 0.0001
 
@@ -368,8 +368,8 @@ def do_langevin_full(initial_path, images, G, steps):
 
     sigma = 0.5
 
-    kappa_2 = 90
-    alpha = 60
+    kappa_2 = 9*1e2*0
+    alpha = 6*1e2*0
     beta = 1.0
     h = 0.0001
 
@@ -384,9 +384,17 @@ def do_langevin_full(initial_path, images, G, steps):
     old_path = initial_path.copy()
     old_prob_mat = post_prob(old_path, images, sigma)
     old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
-    old_neg_post = neglogpost_cryobife(free_energy, kappa_2, old_prob_mat, sigma)
+    old_neg_post = neglogpost_cryobife(free_energy, kappa_2, old_prob_mat)
 
-    old_acc = old_neg_post
+    old_der = models_der(old_path)
+    old_dist = models_dist(old_path)
+
+    mask = np.ones_like(old_path)
+
+    mask[0] = np.zeros((2,))
+    mask[7] = np.zeros((2,))
+    mask[13] = np.zeros((2,))
+
     for step in range(steps):
 
         new_path = old_path.copy()
@@ -397,45 +405,43 @@ def do_langevin_full(initial_path, images, G, steps):
         xi = np.random.randn(n_models, n_dims)
 
         # Calcualte new proposal
-        new_path += -h * old_gradient + np.sqrt(2 * h) * xi
+        new_path += (-h * old_gradient + np.sqrt(2 * h) * xi) * mask
 
         # Not sure what these are for
+        mala_den = old_neg_post - np.sum((new_path - old_path + h * old_gradient)**2 / (4*h), axis=1) - kappa_2 * old_dist - alpha * old_der
 
-        der = models_der(new_path)
-        dist = models_dist(new_path)
+        new_prob_mat = post_prob(new_path, images, sigma)
+        new_neg_post = neglogpost_cryobife(free_energy, kappa_2, new_prob_mat)
+        new_gradient = gradient_cryo_bife(new_path, free_energy, images, new_prob_mat, sigma)
+
+        # Not sure what these are for
+        new_der = models_der(new_path)
+        new_dist = models_dist(new_path)
         
         # !TODO ask Julian where did this come from
-        mala_den = -np.sum( (new_path - old_path + h * old_gradient)**2 ) - kappa_2 * dist - alpha * der
+        mala_num = new_neg_post - np.sum((old_path - new_path + h * new_gradient)**2 / (4*h), axis=1) - kappa_2 * new_dist - alpha * new_der
 
-        aa = 0
-        rr = np.log(np.random.random())
+        rr = np.log(np.random.rand(*mala_den.shape))
 
-        if (mala_den > mala_num):
+        accp = rr < -(mala_num - mala_den) * beta
+        accp = np.array([accp, accp]).T
 
-            aa += 1
+        old_path = ~accp * old_path + accp * new_path
 
-            # Update old variables
-            old_path = new_path.copy()
-            mala_num = mala_den
+        if ~accp.all(): 
             
-            old_prob_mat = post_prob(old_path, images, sigma)
-            old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
-
-        elif (rr < -(mala_num - mala_den) * beta):
-
-            # why?
-            aa += 2
-
-            # Update old variables
-            old_path = new_path.copy()
-            mala_num = mala_den
-            
-            old_prob_mat = post_prob(old_path, images, sigma)
-            old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
-
-        else:
-
             continue
+
+        else:  
+
+            old_prob_mat = post_prob(old_path, images, sigma)
+            old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+            old_neg_post = neglogpost_cryobife(free_energy, kappa_2, old_prob_mat)
+
+            old_der = models_der(old_path)
+            old_dist = models_dist(old_path)
+
+            
     
     # returns last accepted path
     return old_path
@@ -447,22 +453,22 @@ def path_optimization(iterations, initial_path, images, mala_steps):
     paths = np.zeros((iterations+1, *initial_path.shape))
     paths[0] = initial_path
 
+    curr_path = initial_path.copy()
+
     for it in range(iterations):
 
-        G = bife_fes_opt(initial_path, images, sigma)
-        new_path = do_langevin(initial_path, images, G, mala_steps)
+        G = bife_fes_opt(curr_path, images, sigma)
+        curr_path = do_langevin(curr_path, images, G, mala_steps)
 
-        paths[it+1] = new_path
+        paths[it+1] = curr_path
     
     np.save("paths.npy", paths)
 
-    return new_path
+    return 0
 
 def main():
 
-    np.random.seed(0)
-
-    LMC_steps = 20
+    LMC_steps = 100
     path = np.loadtxt("data/Orange")
     images = np.loadtxt("data/images.txt")
     images = images - 10*np.ones(images.shape)
@@ -470,7 +476,7 @@ def main():
 
     
     start_time = time.time()
-    path_optimization(10, path_test, images, LMC_steps)
+    path_optimization(20, path_test, images, LMC_steps)
     #langevin(path_test,images,LMC_steps)
 
     print(f"The program takes {(time.time() - start_time):.4f} seconds for {LMC_steps} LMC steps---")
