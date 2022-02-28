@@ -1,12 +1,15 @@
 import numpy as np
-from sklearn.covariance import log_likelihood
+import time
+import numpy as np
+import scipy.optimize as so
+import matplotlib.pyplot as plt
 
 def integrated_prior(G):
     
     mathcal_G = sum(np.diff(G)**2)
-    log_prior = np.log(1/mathcal_G**2)    # note kappa scales *log* prior
+    new_log_post = np.log(1/mathcal_G**2)    # note kappa scales *log* prior
     
-    return log_prior
+    return new_log_post
 
 def post_prob(path, gauss_image_vector, sigma):
 
@@ -22,21 +25,21 @@ def post_prob(path, gauss_image_vector, sigma):
 
     return prob_matrix.T
 
-def neglogpost_cryobife(G, kappa, Pmat, log_prior_fxn=None):
+def neglogpost_cryobife(G, kappa, Pmat, new_log_post_fxn=None):
 
-    if log_prior_fxn is None: # Default is the prior from the paper
+    if new_log_post_fxn is None: # Default is the prior from the paper
 
-        log_prior_fxn = integrated_prior
+        new_log_post_fxn = integrated_prior
 
-    log_prior = kappa * log_prior_fxn(G)
+    new_log_post = kappa * new_log_post_fxn(G)
     
     rho = np.exp(-G) #density vec
     rho = rho / np.sum(rho) #normalize, Eq.(8)
 
     log_likelihood = np.sum(np.log(np.dot(Pmat, rho))) # sum here since iid images; logsumexp
-    neg_log_posterior = -(log_likelihood + log_prior)
+    neg_log_posterior = -(log_likelihood + new_log_post)
 
-    return neg_log_posterior # check log_prior sign error?
+    return neg_log_posterior # check new_log_post sign error?
 
 def gradient_cryo_bife(path, G, images, prob_mat, sigma, beta=1):
 
@@ -54,7 +57,7 @@ def gradient_cryo_bife(path, G, images, prob_mat, sigma, beta=1):
 
     return -1 / sigma**2 * grad
 
-def numerical_test(path, images, free_energy, sigma=1, dx=0.0001, index=0, model=0):
+def numerical_test(path, images, free_energy, sigma=1, dx=0.0001, index=0, n_models=0):
     
     path_test = np.copy(path)
     
@@ -63,26 +66,395 @@ def numerical_test(path, images, free_energy, sigma=1, dx=0.0001, index=0, model
     log_post1 = neglogpost_cryobife(free_energy, 1, prob_mat)
     grad1 = gradient_cryo_bife(path_test, free_energy, images, prob_mat, 1)
 
-    path_test[model, index] += dx
+    path_test[n_models, index] += dx
 
     prob_mat = post_prob(path_test, images, 1)
     log_post2 = neglogpost_cryobife(free_energy, 1, prob_mat)
     grad2 = gradient_cryo_bife(path_test, free_energy, images, prob_mat, 1)
 
-    analt_grad = grad2[model, index]
+    analt_grad = grad2[n_models, index]
     num_grad = (log_post2 - log_post1)/dx
     
-    print(f"Gradient calculated for index {index} of model {model}")
+    print(f"Gradient calculated for index {index} of n_models {n_models}")
     print(f"Numerical gradient: {num_grad}")
     print(f"Analytical gradient: {analt_grad}")
 
+def models_dist(new_path):  #Penalization respect to the distance of each node respect to their nearest neighbor.
+
+    dist = 0
+
+    for i in range(1,new_path.shape[0]-1):
+
+        dist += (np.sqrt((new_path[i-1][0] - new_path[i][0])**2 + (new_path[i-1][1] - new_path[i][1])**2) \
+              - np.sqrt((new_path[i+1][0] - new_path[i][0])**2 + (new_path[i+1][1] - new_path[i][1])**2)) #**2
+
+    return(dist)
+
+##NUMBA_THREADING_LAYER='omp'
+##config.THREADING_LAYER = 'threadsafe'
+##@njit(parallel=True)
+##@jit
+def models_der(new_path):  #Derivative condition checking the softness of the path.
+
+    th1 = np.arctan2(new_path[1:-1,1] - new_path[:-2,1], new_path[1:-1,0] - new_path[:-2,0])
+    th2 = np.arctan2(new_path[2:,1] - new_path[1:-1,1], new_path[2:,0] - new_path[1:-1,0])
+
+    der = np.sum((th1 - th2)**2)
+
+    return der
+
+##NUMBA_THREADING_LAYER='omp'
+##config.THREADING_LAYER = 'threadsafe'
+##@njit(parallel=True)
+##@jit
+def langevin(path, images, lmc_steps):
+
+    kappa = 1
+    sigma = 0.5
+
+    kappa_2 = 90
+    alpha = 60
+    beta = 1.0
+    h = 0.001
+
+    #lmc_steps = 10
+    num_rejected = 0
+
+    G_acc = []
+    mala_acc = []
+    log_post_acc = []
+    path_x_coords_acc = []
+    path_y_coords_acc = []
+
+    old_path = np.copy(path)
+    n_models = old_path.shape[0]
+    index = old_path.shape[1]
+
+    mala_num = -9999999999999
+
+    for step in range(lmc_steps):
+
+        print(f'LMC step {step}')
+
+        new_path = np.copy(old_path)
+
+        value = False
+        while value == False:
+
+            model_index = np.random.randint(0,n_models)
+
+            if(model_index==0 or model_index==7 or model_index==13):
+
+                print(f'Node {model_index} is fixed...choosing different node')
+                continue
+
+            else: 
+                
+                value = True
+
+        coord_index = np.random.randint(0, 2)
+        print(f'n_models = {model_index} ; coord = {coord_index}')
+
+        Xi = np.random.randn() #(n_models, index)
+        G_rand = 1.0 * np.random.randn(n_models)
+        prob_mat = post_prob(old_path, images, sigma)
+        G_op = so.minimize(neglogpost_cryobife, G_rand ,method='CG',args=(kappa,prob_mat,))
+        log_post_old = -1*G_op.fun
+        free_energy_old = G_op.x
+
+        gradient_old = gradient_cryo_bife(old_path, free_energy_old, images, prob_mat, sigma)
+        new_path[model_index,coord_index] += -h*gradient_old[model_index,coord_index] + np.sqrt(2*h)*Xi #[model_index,coord_index]
+
+        der = models_der(new_path)
+        dist = models_dist(new_path)
+  
+        MALA_den = -log_post_old - np.sum( (new_path - old_path + h * gradient_old)**2 ) - kappa_2*dist - alpha*der
+
+        aa=0
+        rr = np.log(np.random.random())
+
+        if (MALA_den > mala_num):
+
+            aa += 1
+            old_path = np.copy(new_path)
+            mala_num = MALA_den
+            mala_acc.append(MALA_den)
+
+            prob_mat_new = post_prob(new_path, images, sigma)
+            G_op_new = so.minimize(neglogpost_cryobife, G_rand ,method='CG',args=(kappa,prob_mat_new,))
+            log_post_new = -1*G_op_new.fun
+            free_energy_new = G_op_new.x
+
+            path_x_coords_acc.append(new_path[:,0])
+            path_y_coords_acc.append(new_path[:,1])
+            G_acc.append(free_energy_new)
+            log_post_acc.append(log_post_new)
+
+            print('Path Accepted ')
+
+        elif (rr < -(mala_num-MALA_den)*beta):
+
+            aa += 2
+            old_path = np.copy(new_path)
+            mala_num = MALA_den
+            mala_acc.append(MALA_den)
+
+            prob_mat_new = post_prob(new_path, images, sigma)
+            G_op_new = so.minimize(neglogpost_cryobife, G_rand ,method='CG',args=(kappa,prob_mat_new,))
+            log_post_new = -1*G_op_new.fun
+            free_energy_new = G_op_new.x
+
+            path_x_coords_acc.append(new_path[:,0])
+            path_y_coords_acc.append(new_path[:,1])
+            G_acc.append(free_energy_new)
+            log_post_acc.append(log_post_new)
+
+            print('Path Accepted ')
+
+        else:
+
+            old_path = old_path
+            MALA_den = MALA_den
+            num_rejected += 1
+            print('Path Rejected')
+
+        print('ProbsPilar', aa, MALA_den,mala_num, -dist, -der,log_post_new)
+
+        #print(f'Valor Neg_logpost = {-log_post}')
+        #print(f'Valor MALA_New = {MALA_New}') 
+
+        """
+        plt.figure()
+        plt.plot([i for i in range(len(free_energy))],free_energy,'-o', label = 'free energy')
+        plt.legend()
+        plt.show()
+        """
+    G_acc = np.array(G_acc)
+    mala_acc = np.array(mala_acc)
+    log_post_acc = np.array(log_post_acc)
+    path_x_coords_acc = np.array(path_x_coords_acc)
+    path_y_coords_acc = np.array(path_y_coords_acc)
+
+    np.savetxt('G_acc',G_acc)
+    np.savetxt('mala_acc',mala_acc)
+    np.savetxt('log_post_acc',log_post_acc)
+    np.savetxt('path_x_coords_acc',path_x_coords_acc)
+    np.savetxt('path_y_coords_acc',path_y_coords_acc)
+    
+    print('Total rejected paths =',num_rejected)
+
+    return(new_path)
+
+def bife_fes_opt(path, images, sigma):
+
+    kappa = 1
+
+    n_models = path.shape[0]
+
+    G_rand = 1.0 * np.random.randn(n_models)
+    prob_mat = post_prob(path, images, sigma)
+
+    G_op = so.minimize(neglogpost_cryobife, G_rand, method='CG', args=(kappa, prob_mat))
+
+    return G_op
+
+def do_langevin(initial_path, images, G, steps):
+
+    sigma = 0.5
+
+    kappa_2 = 9*1e2
+    alpha = 6*1e2
+    beta = 1.0
+    h = 0.001
+
+    n_models = initial_path.shape[0]
+
+    # Variables related to G
+    new_log_post = -1 * G.fun
+    free_energy = G.x
+
+    # Calculate "old" variables
+    old_path = initial_path.copy()
+    old_prob_mat = post_prob(old_path, images, sigma)
+    old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+
+    mala_num = -np.inf
+    for step in range(steps):
+
+        new_path = old_path.copy()
+
+        # Selecting which replica to update
+
+        value = True
+        while value:
+
+            model_index = np.random.randint(0, n_models)
+            if(model_index==0 or model_index==7 or model_index==13):
+
+                #print(f'Node {model_index} is fixed...choosing different node')
+                continue
+
+            else: value = False
+
+        coord_index = np.random.randint(0, 2)
+
+        # random noise for Langevin
+        xi = np.random.randn()
+
+        # Calcualte new proposal
+        new_path[model_index, coord_index] += -h * old_gradient[model_index, coord_index] + np.sqrt(2 * h) * xi
+
+        # Not sure what these are for
+
+        der = models_der(new_path)
+        dist = models_dist(new_path)
+        
+        # !TODO ask Julian where did this come from
+        mala_den = -new_log_post - np.sum( (new_path - old_path + h * old_gradient)**2 ) - kappa_2 * dist - alpha * der
+
+        aa = 0
+        rr = np.log(np.random.random())
+
+        if (mala_den > mala_num):
+
+            aa += 1
+
+            # Update old variables
+            old_path = new_path.copy()
+            mala_num = mala_den
+            
+            old_prob_mat = post_prob(old_path, images, sigma)
+            old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+
+        elif (rr < -(mala_num - mala_den) * beta):
+
+            # why?
+            aa += 2
+
+            # Update old variables
+            old_path = new_path.copy()
+            mala_num = mala_den
+            
+            old_prob_mat = post_prob(old_path, images, sigma)
+            old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+
+        else:
+
+            continue
+    
+    # returns last accepted path
+    return old_path
+
+def do_langevin_full(initial_path, images, G, steps):
+
+    sigma = 0.5
+
+    kappa_2 = 90
+    alpha = 60
+    beta = 1.0
+    h = 0.0001
+
+    n_models = initial_path.shape[0]
+    n_dims = initial_path.shape[1]
+
+    # Variables related to G
+    new_log_post = -1 * G.fun
+    free_energy = G.x
+
+    # Calculate "old" variables
+    old_path = initial_path.copy()
+    old_prob_mat = post_prob(old_path, images, sigma)
+    old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+    old_neg_post = neglogpost_cryobife(free_energy, kappa_2, old_prob_mat, sigma)
+
+    old_acc = old_neg_post
+    for step in range(steps):
+
+        new_path = old_path.copy()
+
+        # Selecting which replica to update
+
+        # random noise for Langevin
+        xi = np.random.randn(n_models, n_dims)
+
+        # Calcualte new proposal
+        new_path += -h * old_gradient + np.sqrt(2 * h) * xi
+
+        # Not sure what these are for
+
+        der = models_der(new_path)
+        dist = models_dist(new_path)
+        
+        # !TODO ask Julian where did this come from
+        mala_den = -np.sum( (new_path - old_path + h * old_gradient)**2 ) - kappa_2 * dist - alpha * der
+
+        aa = 0
+        rr = np.log(np.random.random())
+
+        if (mala_den > mala_num):
+
+            aa += 1
+
+            # Update old variables
+            old_path = new_path.copy()
+            mala_num = mala_den
+            
+            old_prob_mat = post_prob(old_path, images, sigma)
+            old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+
+        elif (rr < -(mala_num - mala_den) * beta):
+
+            # why?
+            aa += 2
+
+            # Update old variables
+            old_path = new_path.copy()
+            mala_num = mala_den
+            
+            old_prob_mat = post_prob(old_path, images, sigma)
+            old_gradient = gradient_cryo_bife(old_path, free_energy, images, old_prob_mat, sigma)
+
+        else:
+
+            continue
+    
+    # returns last accepted path
+    return old_path
+
+def path_optimization(iterations, initial_path, images, mala_steps):
+
+    sigma = 0.5
+
+    paths = np.zeros((iterations+1, *initial_path.shape))
+    paths[0] = initial_path
+
+    for it in range(iterations):
+
+        G = bife_fes_opt(initial_path, images, sigma)
+        new_path = do_langevin(initial_path, images, G, mala_steps)
+
+        paths[it+1] = new_path
+    
+    np.save("paths.npy", paths)
+
+    return new_path
+
 def main():
+
+    np.random.seed(0)
+
+    LMC_steps = 20
+    path = np.loadtxt("data/Orange")
+    images = np.loadtxt("data/images.txt")
+    images = images - 10*np.ones(images.shape)
+    path_test = np.copy(path) - 11*np.ones(path.shape)
+
     
-    path = np.loadtxt("data/path.txt")
-    free_energy = np.loadtxt("data/free_energy.txt")
-    gauss_image_vector = np.loadtxt("data/images.txt")
-    
-    numerical_test(path, gauss_image_vector, free_energy, sigma=1, dx=0.0001, index=0, model=0)
+    start_time = time.time()
+    path_optimization(10, path_test, images, LMC_steps)
+    #langevin(path_test,images,LMC_steps)
+
+    print(f"The program takes {(time.time() - start_time):.4f} seconds for {LMC_steps} LMC steps---")
     
     return 0
 
