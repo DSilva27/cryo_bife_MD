@@ -1,0 +1,53 @@
+import numpy as np
+from cryo_bimep.cryo_bife import CryoBife
+
+class CryoBimep(CryoBife):
+
+
+    def __init__(self):
+
+        #self.cbife_object = CryoBife()
+        CryoBife.__init__(self)
+
+    def set_simulator(self, sim_func, sim_args):
+
+        self._simulator = sim_func
+        self._sim_args = sim_args
+    
+    def set_grad_and_energy_func(self, grad_and_energy_func, args):
+
+        self._grad_and_energy_func = grad_and_energy_func
+        self._grad_and_energy_args = args
+
+    def path_optimization(self, initial_path, images, steps, paths_fname = None):
+
+        sigma = 0.5
+
+        paths = np.zeros((steps+1, *initial_path.shape))
+        paths[0] = initial_path
+
+        curr_path = initial_path.copy()
+
+        for i in range(steps):
+
+            fe_prof = self.optimizer(curr_path, images, sigma)
+            curr_path = self._simulator(curr_path, fe_prof, self._grad_and_energy_func, self._grad_and_energy_args, *self._sim_args)
+
+            paths[i+1] = curr_path
+
+        if paths_fname is not None:
+            
+            if ".txt" in paths_fname:
+                np.savetxt(f"{paths_fname}", paths)
+
+            elif ".npy" in paths_fname:
+                np.save(f"{paths_fname}", paths)
+
+            else:
+                print(f"Unknown file extension, saving as npy instead")
+                np.save(f"{paths_fname.partition('.')[0]}.npy", paths)
+
+        return 0
+
+
+
