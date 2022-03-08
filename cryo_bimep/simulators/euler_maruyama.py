@@ -3,7 +3,7 @@ from typing import Callable, Tuple
 import numpy as np
 
 
-def run_mala(
+def run_euler_maruyama(
         initial_path: np.ndarray,
         fe_prof: np.ndarray,
         grad_and_energy_func: Callable,
@@ -42,23 +42,10 @@ def run_mala(
         path_index = tuple(path_index)
 
         # Calculate new proposal
-        new_path[path_index] += -step_size*old_grad[path_index] +\
+        old_path[path_index] += -step_size*old_grad[path_index] +\
                                               np.sqrt(2*step_size) * np.random.randn()
-        new_energy, new_grad = grad_and_energy_func(new_path, fe_prof, *grad_and_energy_args)
+        #new_energy, new_grad = grad_and_energy_func(new_path, fe_prof, *grad_and_energy_args)
 
-        # Calculate hastings ratio
-        hast_ratio = new_energy + np.sum((old_path - new_path + step_size*new_grad)**2 / \
-                                  (4*step_size), axis=1)[path_index[0]] -\
-                     old_energy - np.sum((new_path - old_path + step_size*old_grad)**2 / \
-                                  (4*step_size), axis=1)[path_index[0]]
-
-        hast_ratio = max(0.0, hast_ratio)
-
-        if hast_ratio <= -np.log(np.random.rand()):
-
-            old_path = new_path.copy()
-            old_energy = new_energy
-            old_grad = new_grad.copy()
 
     # returns last accepted path
     return old_path

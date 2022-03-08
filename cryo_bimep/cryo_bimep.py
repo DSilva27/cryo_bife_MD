@@ -1,15 +1,33 @@
+"Provides implementation of cryo-BIMEP"
+from typing import Callable, Tuple
 import numpy as np
+
 from cryo_bimep.cryo_bife import CryoBife
 
 class CryoBimep(CryoBife):
+    """CryoBimep provides the methodology to optimize a path using
+       a simulator and cryo-bife iteratively."""
 
 
     def __init__(self):
-
-        #self.cbife_object = CryoBife()
+        """Constructor. Initializes cryo-bife object.
+        """
         CryoBife.__init__(self)
 
-    def set_simulator(self, sim_func, sim_args):
+        self._simulator = None
+        self._sim_args = None
+
+        self._grad_and_energy_func = None
+        self._grad_and_energy_args = None
+
+    def set_simulator(
+            self,
+            sim_func: Callable,
+            sim_args: Tuple):
+        """Defines the simulator to be used.
+
+        :param sim_func: 
+        """
 
         self._simulator = sim_func
         self._sim_args = sim_args

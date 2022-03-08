@@ -33,7 +33,7 @@ class CryoBife:
                      Shape must be (n_models, n_dimensions).
         :param images: Array with all the experimental images.
                        Shape must be (n_images, image_dimensions)
-        :param sigma: TODO
+        :param sigma: Overall noise among the images
 
         :returns: Array with the likelihood of observing each image given each model.
                   Shape will be (n_images, n_models)
@@ -82,7 +82,7 @@ class CryoBife:
         neg_log_posterior = -(log_likelihood + log_prior)
 
         return neg_log_posterior
-    
+
     @staticmethod
     def grad_and_energy(
             path: np.ndarray,

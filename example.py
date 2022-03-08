@@ -3,7 +3,7 @@ import numpy as np
 from cryo_bimep import CryoBimep
 from cryo_bimep.cryo_bife import CryoBife
 from cryo_bimep.constraints import distances
-from cryo_bimep.simulators import mala
+from cryo_bimep.simulators import mala, euler_maruyama
 
 def energy_and_grad_wrapper(path, fe_prof, cbife_args, dist_args):
 
@@ -16,8 +16,6 @@ def energy_and_grad_wrapper(path, fe_prof, cbife_args, dist_args):
     return e_total, grad_total
 
 def main():
-
-    np.random.seed(0)
 
     cryo_bimep_obj = CryoBimep()
 
@@ -36,8 +34,8 @@ def main():
     cb_args = (images, cb_sigma, cb_beta, cb_kappa)
 
     # distance constraint args
-    dc_kappa = 200*0
-    dc_d0 = 2.5
+    dc_kappa = 200
+    dc_d0 = 1
     dc_args = (dc_kappa, dc_d0)
 
     # Energy and grad wrapper args
@@ -46,7 +44,7 @@ def main():
 
     # Run path optimization
     initial_path = np.loadtxt("example_data/Orange")
-    opt_steps = 10
+    opt_steps = 30
     opt_fname = "paths.npy"
     cryo_bimep_obj.path_optimization(initial_path, images, opt_steps, opt_fname)
 
