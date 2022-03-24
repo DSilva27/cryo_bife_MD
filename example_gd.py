@@ -21,7 +21,7 @@ def main():
 
     # Set simulator
     images = np.loadtxt("example_data/2-wells_images.txt")
-    gd_steps = 100
+    gd_steps = 10
     gd_step_size = 0.00001
     gd_batch_size = int(images.shape[0]*0.1)
     gd_args = (images, gd_steps, gd_step_size, gd_batch_size)
@@ -35,7 +35,7 @@ def main():
     cb_args = (cb_sigma, cb_beta, cb_kappa)
 
     # distance constraint args
-    dc_kappa = 2000
+    dc_kappa = 200
     dc_d0 = 0.5
     dc_args = (dc_kappa, dc_d0)
 

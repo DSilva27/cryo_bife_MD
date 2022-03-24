@@ -39,7 +39,8 @@ def run_stochastic_gd(
     if batch_size is None:
         batch_size = images.shape[0]
 
-    #assert images.shape[0]%batch_size == 0, "Batch size is not a multiple of the number of images"
+    number_of_batches = images.shape[0]//batch_size
+    residual_batches = images.shape[0]%batch_size
 
     sim_path = initial_path.copy()
 
@@ -55,10 +56,21 @@ def run_stochastic_gd(
 
     for _ in range(steps):
 
-        images_batch = images[np.random.randint(images.shape[0], size=batch_size), :]
+        images_shuffled = images.copy()
+        np.random.shuffle(images_shuffled)
 
-        __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
-        sim_path += -step_size*grad * mask
+        for i in range(number_of_batches):
+
+            images_batch = images_shuffled[i*batch_size:(i+1)*batch_size]
+
+            __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
+            sim_path += -step_size*grad * mask
+
+        if residual_batches != 0:
+
+            images_batch = images_shuffled[(number_of_batches-1)*batch_size:]
+            __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
+            sim_path += -step_size*grad * mask
 
         if np.sum(abs(sim_path - old_path)) < tol:
             break
