@@ -1,7 +1,6 @@
-"""Provide MALA simulator for path optimization with cryo-bife"""
+"""Provide Langevin simulator for path optimization with cryo-bife"""
 from typing import Callable, Tuple
 import numpy as np
-
 
 def run_euler_maruyama(
         initial_path: np.ndarray,
@@ -10,7 +9,7 @@ def run_euler_maruyama(
         grad_and_energy_args: Tuple,
         steps: float,
         step_size: float = 0.0001) -> np.ndarray:
-    """Run simulation using MALA algorithm.
+    """Run simulation using Euler-Maruyama algorithm.
 
     :param initial_path: Array with the initial values of the free-energy profile in each
         node of the path.
@@ -26,26 +25,28 @@ def run_euler_maruyama(
     """
 
     # Calculate "old" variables
-    old_path = initial_path.copy()
-    old_energy, old_grad = grad_and_energy_func(old_path, fe_prof, *grad_and_energy_args)
+    sim_path = initial_path.copy()
+
+    mask = np.ones_like(sim_path)
+
+    mask[0] = np.zeros((2,))
+    #mask[7] = np.zeros((2,))
+    mask[-1] = np.zeros((2,))
 
     for _ in range(steps):
 
-        new_path = old_path.copy()
+        # # Selecting which replica to update
+        # path_index = [np.random.randint(0, initial_path.shape[0]), np.random.randint(0, 2)]
+        # while path_index[0] in (0, 7, 13):
+        #     path_index[0] = np.random.randint(0, initial_path.shape[0])
 
-        # Selecting which replica to update
-        path_index = [np.random.randint(0, initial_path.shape[0]), np.random.randint(0, 2)]
-        while path_index[0] in (0, 7, 13):
-            path_index[0] = np.random.randint(0, initial_path.shape[0])
+        # # Select which coordinate to update
+        # path_index = tuple(path_index)
 
-        # Select which coordinate to update
-        path_index = tuple(path_index)
 
         # Calculate new proposal
-        old_path[path_index] += -step_size*old_grad[path_index] +\
-                                              np.sqrt(2*step_size) * np.random.randn()
-        #new_energy, new_grad = grad_and_energy_func(new_path, fe_prof, *grad_and_energy_args)
-
+        __, grad = grad_and_energy_func(sim_path, fe_prof, *grad_and_energy_args)
+        sim_path += (-step_size*grad + np.sqrt(2*step_size) * np.random.randn()) * mask
 
     # returns last accepted path
-    return old_path
+    return sim_path
