@@ -72,7 +72,7 @@ def run_stochastic_gd(
             __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
             sim_path += -step_size*grad * mask
 
-        if np.sum(abs(sim_path - old_path)) < tol:
+        if np.sum(abs(sim_path - old_path)) / sim_path.size < tol:
             break
 
         old_path = sim_path.copy()

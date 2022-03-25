@@ -1,6 +1,7 @@
 "Provides implementation of cryo-BIMEP"
 from typing import Callable, Tuple
 import numpy as np
+from tqdm import tqdm
 
 from cryo_bimep.cryo_bife import CryoBife
 
@@ -46,10 +47,11 @@ class CryoBimep(CryoBife):
 
         curr_path = initial_path.copy()
 
-        for i in range(steps):
+        for i in tqdm(range(steps)):
 
             fe_prof = self.optimizer(curr_path, images, sigma)
-            curr_path = self._simulator(curr_path, fe_prof, self._grad_and_energy_func, self._grad_and_energy_args, *self._sim_args)
+            curr_path = self._simulator(curr_path, fe_prof, self._grad_and_energy_func, 
+                                        self._grad_and_energy_args, *self._sim_args)
 
             paths[i+1] = curr_path
 
@@ -58,7 +60,7 @@ class CryoBimep(CryoBife):
                 break
 
         if paths_fname is not None:
-            
+
             if ".txt" in paths_fname:
                 np.savetxt(f"{paths_fname}", paths)
 
