@@ -51,7 +51,6 @@ def run_stochastic_gd(
     #mask[7] = np.zeros((2,))
     mask[-1] = np.zeros((2,))
 
-    tol = 1e-3
     old_path = initial_path.copy()
 
     for _ in range(steps):
@@ -72,8 +71,6 @@ def run_stochastic_gd(
             __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
             sim_path += -step_size*grad * mask
 
-        if np.sum(abs(sim_path - old_path)) / sim_path.size < tol:
-            break
 
         old_path = sim_path.copy()
 
