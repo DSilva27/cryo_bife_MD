@@ -169,3 +169,58 @@ class CryoBife:
                                         args=(kappa, prob_mat))
 
         return optimized_fe_prof.x
+
+
+class CryoVIFE(object):
+    def __init__(self, images, sigma, beta):
+        super().__init__()
+        self.images = images
+        self.sigma = sigma
+        self.beta = beta
+
+    def __call__(self, path, fe_prof):
+        return CryoVIFE.grad_and_energy(path, fe_prof, self.images, 
+                                        self.sigma, self.beta)
+
+    @staticmethod
+    def grad_and_energy(
+            path: np.ndarray,
+            fe_prof: np.ndarray,
+            images: np.ndarray,
+            sigma: float,
+            beta: float = 1) -> Tuple[float, np.ndarray]:
+        """Calculate loss function for VI. 
+
+        :param path: Array with the values of the variables at each node of the path.
+                     Shape must be (n_models, n_dimensions).
+        :param fe_prof: Array with the values of the free-energy profile (FEP)
+                        in each node of the path.
+        :param images: Array with all the experimental images.
+                       Shape must be (n_images, image_dimensions)
+        :param sigma: TODO.
+        :param beta: Temperature.
+        :prior_fxn: Function used to calculate the FEP's prior
+
+        :returns: Value of the negative log-posterior
+        """
+        num_nodes = path.shape[0]
+
+        # TODO: Think for a better name for rho
+        rho = np.exp(-beta * fe_prof) #density vec
+        rho = rho / np.sum(rho) #normalize, Eq.(8)
+
+        
+        path_image_dists = (path - images[:, None])
+        variance= sigma**2
+        lognorm = -np.log(2 * np.pi * variance)
+        log_prob_mat = -np.sum(path_image_dists**2, axis=-1) / (2 * variance)  # Unnormalized, we can add the normalization constant later.
+
+        # Sum here since iid images
+        variational_cost = - np.mean(np.dot(log_prob_mat, rho)) + num_nodes * lognorm
+        entropy = np.dot(rho, np.log(rho))
+        negative_elbo = variational_cost + entropy
+
+        # Calculate gradient with respect to nodes 
+        grad = np.mean(path_image_dists, axis=0) * rho.reshape(-1, 1) / (variance)
+
+        return negative_elbo, grad
