@@ -41,7 +41,6 @@ class CryoBimep(CryoBife):
     def path_optimization(self, initial_path, images, steps, paths_fname = None):
 
         sigma = 0.5
-        tol = 1e-2
         paths = np.zeros((steps+1, *initial_path.shape))
         paths[0] = initial_path
 
@@ -54,10 +53,6 @@ class CryoBimep(CryoBife):
                                         self._grad_and_energy_args, *self._sim_args)
 
             paths[i+1] = curr_path
-
-            if np.sum(abs(paths[i+1] - paths[i]))/initial_path.size < tol:
-                paths = paths[:i+1]
-                break
 
         if paths_fname is not None:
 
