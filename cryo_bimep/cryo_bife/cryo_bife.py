@@ -171,7 +171,7 @@ class CryoBife:
         return optimized_fe_prof.x
 
 
-class CryoVIFE(object):
+class CryoVife(object):
     def __init__(self, images, sigma, beta):
         super().__init__()
         self.images = images

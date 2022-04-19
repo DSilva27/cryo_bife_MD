@@ -13,6 +13,7 @@ David Silva-Sánchez, Julian David Giraldo-Barreto, Pilar Cossio, Erik Henning T
 ### Set up conda environment
 
 `conda env create -f environment.yml`
+`conda activate cryo_bife`
 
 ### Install the package
 

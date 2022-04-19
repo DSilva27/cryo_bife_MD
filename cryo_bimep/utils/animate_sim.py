@@ -14,7 +14,7 @@ from matplotlib import animation
 import pandas as pd
 import seaborn as sns
 
-def animate_simulation(traj, initial_path, images=None, ref_path=None):
+def animate_simulation(traj, initial_path, images=None, ref_path=None, anim_file=None):
 
     min_x = np.min(traj[:,:,0]); min_y = np.min(traj[:,:,1])
     max_x = np.max(traj[:,:,0]); max_y = np.max(traj[:,:,1])
@@ -24,12 +24,12 @@ def animate_simulation(traj, initial_path, images=None, ref_path=None):
     ax = plt.axes()
     line, = ax.plot([], [], lw=2, ls="--", marker="o")
 
-    df = pd.DataFrame()
-
-    df["x"] = images[:,0]
-    df["y"] = images[:,1]
-
     if images is not None:
+
+        df = pd.DataFrame()
+
+        df["x"] = images[:,0]
+        df["y"] = images[:,1]
         sns.kdeplot(data=df, x="x", y="y", ax=ax, shade=True, cbar=True, cmap="vlag")
     
     if ref_path is not None:
@@ -65,9 +65,10 @@ def animate_simulation(traj, initial_path, images=None, ref_path=None):
     # your system: for more information, see
     # http://matplotlib.sourceforge.net/api/animation_api.html
 
-    writergif = animation.PillowWriter(fps=30) 
-    anim.save('basic_animation.gif', writer=writergif)
+    writergif = animation.PillowWriter(fps=15) 
 
-    plt.savefig("final_step.png", dpi=300)
+    if anim_file is not None:
+        anim.save(f'{anim_file}.gif', writer=writergif)
+        plt.savefig(f"{anim_file}.png", dpi=300)
 
     plt.show()
