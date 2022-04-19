@@ -6,7 +6,7 @@ import scipy.optimize as so
 
 class CryoBife:
     """CryoBife provides cryo-bife's prior, likelihood, posterior and
-    the optimizer as described in 10.1038/s41598-021-92621-1. """
+    the optimizer as described in doi: 10.1038/s41598-021-92621-1. """
 
     @staticmethod
     def integrated_prior(fe_prof: np.ndarray) -> float:

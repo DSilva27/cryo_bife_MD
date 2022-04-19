@@ -66,7 +66,7 @@ class CryoBimep(CryoBife):
                 print(f"Unknown file extension, saving as npy instead")
                 np.save(f"{paths_fname.partition('.')[0]}.npy", paths)
 
-        return 0
+        return paths
 
 
 

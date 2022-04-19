@@ -4,6 +4,7 @@ from cryo_bimep import CryoBimep
 from cryo_bimep.cryo_bife import CryoBife
 from cryo_bimep.constraints import distances
 from cryo_bimep.simulators import stochastic_gd
+from cryo_bimep.utils import animate_simulation
 
 def energy_and_grad_wrapper(path, fe_prof, images, cbife_args, dist_args):
 
@@ -20,10 +21,10 @@ def main():
     cryo_bimep_obj = CryoBimep()
 
     # Set simulator
-    images = np.loadtxt("example_data/2-wells_images.txt")
-    gd_steps = 100
+    images = np.loadtxt("test_data/images_3well.txt")
+    gd_steps = 10
     gd_step_size = 0.00001
-    gd_batch_size = int(images.shape[0]*0.1)
+    gd_batch_size = int(images.shape[0] * 0.1)
     gd_args = (images, gd_steps, gd_step_size, gd_batch_size)
     cryo_bimep_obj.set_simulator(stochastic_gd.run_stochastic_gd, gd_args)
 
@@ -36,7 +37,7 @@ def main():
 
     # distance constraint args
     dc_kappa = 1000
-    dc_d0 = 0.5
+    dc_d0 = 0.0
     dc_args = (dc_kappa, dc_d0)
 
     # Energy and grad wrapper args
@@ -44,15 +45,19 @@ def main():
     cryo_bimep_obj.set_grad_and_energy_func(energy_and_grad_wrapper, energy_and_grad_args)
 
     # Run path optimization
-    initial_path = np.loadtxt("example_data/Path_orange-David") - 1
-    initial_path[:, [0,1]] = initial_path[:, [1,0]]
-    opt_steps = 30
+    initial_path = np.loadtxt("test_data/mid_node_far") - 1
+    #initial_path[:, [0,1]] = initial_path[:, [1,0]]
+    opt_steps = 5
     opt_fname = "paths.npy"
 
     print("Starting path optimization using sthochastic gradient descent")
     print(f"Optimization iteratons: {opt_steps}, gd steps: {gd_steps}")
-    cryo_bimep_obj.path_optimization(initial_path, images, opt_steps, opt_fname)
+    traj = cryo_bimep_obj.path_optimization(initial_path, images, opt_steps, opt_fname)
     print("Optimization finished")
+    print("*"*80)
+    print("Animating trajectory")
+    animate_simulation(traj, initial_path, images)
+
 
     return 0
 
