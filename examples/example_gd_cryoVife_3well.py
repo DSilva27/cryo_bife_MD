@@ -41,7 +41,7 @@ def main():
     cv_args = (cv_sigma, cv_beta)
 
     # distance constraint args
-    dc_kappa = 0
+    dc_kappa = 1
     dc_d0 = 0.0
     dc_args = (dc_kappa, dc_d0)
 
@@ -52,7 +52,7 @@ def main():
     # Run path optimization
     #This path has the node in the middle far away from where it's supposed to be
     initial_path = np.loadtxt("3_well_data/initial_path_far_mid_node") - 1
-    opt_steps = 3
+    opt_steps = 30
     opt_fname = None#"paths.npy"
 
     print("Starting path optimization using sthochastic gradient descent")

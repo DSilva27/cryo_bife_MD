@@ -208,10 +208,9 @@ class CryoVife(object):
         # TODO: Think for a better name for rho
         rho = np.exp(-beta * fe_prof) #density vec
         rho = rho / np.sum(rho) #normalize, Eq.(8)
-
         
         path_image_dists = (path - images[:, None])
-        variance= sigma**2
+        variance = sigma**2
         lognorm = -np.log(2 * np.pi * variance)
         log_prob_mat = -np.sum(path_image_dists**2, axis=-1) / (2 * variance)  # Unnormalized, we can add the normalization constant later.
 
