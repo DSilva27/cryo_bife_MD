@@ -4,6 +4,8 @@ import numpy as np
 from tqdm import tqdm
 
 from cryo_bimep.cryo_bife import CryoBife
+from cryo_bimep.utils import prep_for_mpi
+
 
 class CryoBimep(CryoBife):
     """CryoBimep provides the methodology to optimize a path using
@@ -38,23 +40,32 @@ class CryoBimep(CryoBife):
         self._grad_and_energy_func = grad_and_energy_func
         self._grad_and_energy_args = args
 
-    def path_optimization(self, initial_path, images, steps, paths_fname = None):
+    def path_optimization(
+            self,
+            initial_path,
+            images,
+            steps,
+            mpi_params,
+            paths_fname = None):
 
         sigma = 0.5
-        paths = np.zeros((steps+1, *initial_path.shape))
+        paths = np.zeros((steps + 1, *initial_path.shape))
         paths[0] = initial_path
 
-        curr_path = initial_path.copy()
+        
 
         for i in tqdm(range(steps)):
 
-            fe_prof = self.optimizer(curr_path, images, sigma)
-            curr_path = self._simulator(curr_path, fe_prof, self._grad_and_energy_func, 
+            fe_prof = self.optimizer(path_rank, images, sigma, mpi_params)
+            path_rank = self._simulator(path_rank, fe_prof, self._grad_and_energy_func, 
                                         self._grad_and_energy_args, *self._sim_args)
+            lenghts = np.array(comm.allgather(path_rank.size))
 
-            paths[i+1] = curr_path
+            tmp_path = np.empty((initial_path.size))
+            comm.Allgatherv(path_rank, (tmp_path, lenghts))
+            paths[i+1] = tmp_path.reshape(initial_path.shape)
 
-        if paths_fname is not None:
+        if paths_fname is not None and rank == 0:
 
             if ".txt" in paths_fname:
                 np.savetxt(f"{paths_fname}", paths)

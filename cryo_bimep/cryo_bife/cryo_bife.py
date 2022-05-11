@@ -90,6 +90,7 @@ class CryoBife:
             images: np.ndarray,
             sigma: float,
             kappa: float,
+            mpi_params: Tuple,
             beta: float = 1,
             prior_fxn: Callable = None) -> Tuple[float, np.ndarray]:
         """Calculate cryo-bife's negative log-posterior.
@@ -101,12 +102,21 @@ class CryoBife:
         :param images: Array with all the experimental images.
                        Shape must be (n_images, image_dimensions)
         :param sigma: TODO.
-        :param beta: Temperature.
         :param kappa: Scaling factor for the prior.
+        :param mpi_params: rank, world_size and communicator
+        :param beta: Inverse temperature.
         :prior_fxn: Function used to calculate the FEP's prior
 
         :returns: Value of the negative log-posterior
         """
+
+        # Setting up parallel stuff
+        rank, world_size, comm = mpi_params
+
+        # Setting up numbers of things 
+        n_images = images.shape[0]
+        n_nodes = world_size + 2
+
         if prior_fxn is None:
             # Default is the prior from the paper
             prior_fxn = CryoBife.integrated_prior
@@ -115,7 +125,12 @@ class CryoBife:
         rho = np.exp(-beta * fe_prof) #density vec
         rho = rho / np.sum(rho) #normalize, Eq.(8)
 
-        prob_mat = CryoBife.likelihood(path, images, sigma)
+        prob_mat_rank = CryoBife.likelihood(path, images, sigma)
+        lenghts = np.array(comm.allgather(prob_mat_rank.size))
+
+        prob_mat = np.empty((n_images * n_nodes))
+        comm.Allgatherv(prob_mat_rank.T.flatten(), (prob_mat, lenghts))
+        prob_mat = prob_mat.reshape(n_nodes, n_images).T
 
         # Sum here since iid images; logsumexp
         log_likelihood = np.sum(np.log(np.dot(prob_mat, rho)))
@@ -128,10 +143,18 @@ class CryoBife:
 
         weighted_pmat = rho[:,None] * prob_mat.T / np.sum(prob_mat * rho, axis=1)
 
-        grad[:,0] = -1 / sigma**2 * np.sum((images[:,0] - path[:,0][:,None]) *\
-                    weighted_pmat, axis=1)
-        grad[:,1] = -1 / sigma**2 * np.sum((images[:,1] - path[:,1][:,None]) *\
-                    weighted_pmat, axis=1)
+        if rank == 0:
+           
+            grad[1,0] = -1 / sigma**2 * np.sum((images[:,0] - path[1,0]) * weighted_pmat[1,:])
+            grad[1,1] = -1 / sigma**2 * np.sum((images[:,1] - path[1,1]) * weighted_pmat[1,:])
+
+        elif rank == world_size - 1:
+            grad[0,0] = -1 / sigma**2 * np.sum((images[:,0] - path[0,0]) * weighted_pmat[-2,:])
+            grad[0,1] = -1 / sigma**2 * np.sum((images[:,1] - path[0,1]) * weighted_pmat[-2,:])
+
+        else:
+            grad[0,0] = -1 / sigma**2 * np.sum((images[:,0] - path[0,0]) * weighted_pmat[rank + 1,:])
+            grad[0,1] = -1 / sigma**2 * np.sum((images[:,1] - path[0,1]) * weighted_pmat[rank + 1,:])
 
         return neg_log_posterior, grad
 
@@ -141,6 +164,7 @@ class CryoBife:
             path: np.ndarray,
             images: np.ndarray,
             sigma: float,
+            mpi_params: Tuple,
             initial_fe_prof: np.ndarray = None) -> np.ndarray:
         """Find the optimal free-energy profile given a path and a dataset of images
 
@@ -154,14 +178,24 @@ class CryoBife:
         :returns: Optimized free-energy profile
         """
 
+        # Setting up parallel stuff
+        rank, world_size, comm = mpi_params
+        # Setting up numbers of things 
+        n_images = images.shape[0]
+        n_nodes = world_size + 2
+
         kappa = 1
-        n_models = path.shape[0]
 
         if initial_fe_prof is None:
 
-            initial_fe_prof = 1.0 * np.random.randn(n_models)
+            initial_fe_prof = 1.0 * np.random.randn(n_nodes)
 
-        prob_mat = self.likelihood(path, images, sigma)
+        prob_mat_rank = self.likelihood(path, images, sigma)
+        lenghts = np.array(comm.allgather(prob_mat_rank.size))
+
+        prob_mat = np.empty((n_images * n_nodes))
+        comm.Allgatherv(prob_mat_rank.T.flatten(), (prob_mat, lenghts))
+        prob_mat = prob_mat.reshape(n_nodes, n_images).T
 
         optimized_fe_prof = so.minimize(self.neg_log_posterior,
                                         initial_fe_prof,

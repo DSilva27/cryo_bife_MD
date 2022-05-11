@@ -2,6 +2,7 @@
 from typing import Callable, Tuple
 import numpy as np
 
+
 def run_stochastic_gd(
         initial_path: np.ndarray,
         fe_prof: np.ndarray,
@@ -9,6 +10,7 @@ def run_stochastic_gd(
         grad_and_energy_args: Tuple,
         images: np.ndarray,
         steps: float,
+        comm,
         step_size: float = 0.0001,
         batch_size: int = None) -> np.ndarray:
     """Run simulation using stochastic gradient descent.
@@ -39,19 +41,10 @@ def run_stochastic_gd(
     if batch_size is None:
         batch_size = images.shape[0]
 
-    number_of_batches = images.shape[0]//batch_size
-    residual_batches = images.shape[0]%batch_size
+    number_of_batches = images.shape[0] // batch_size
+    residual_batches = images.shape[0] % batch_size
 
     sim_path = initial_path.copy()
-
-    #TODO set this up as a parameter for the simulator (fixed_nodes)
-    mask = np.ones_like(sim_path)
-
-    mask[0] = np.zeros((2,))
-    #mask[7] = np.zeros((2,))
-    mask[-1] = np.zeros((2,))
-
-    old_path = initial_path.copy()
 
     for _ in range(steps):
 
@@ -60,19 +53,19 @@ def run_stochastic_gd(
 
         for i in range(number_of_batches):
 
-            images_batch = images_shuffled[i*batch_size:(i+1)*batch_size]
+            images_batch = images_shuffled[i * batch_size: (i + 1) * batch_size]
 
+            comm.Barrier()
             __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
-            sim_path += -step_size*grad * mask
+            sim_path += -step_size * grad
 
         if residual_batches != 0:
 
-            images_batch = images_shuffled[(number_of_batches-1)*batch_size:]
+            images_batch = images_shuffled[(number_of_batches - 1) * batch_size:]
+
+            comm.Barrier()
             __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
-            sim_path += -step_size*grad * mask
-
-
-        old_path = sim_path.copy()
+            sim_path += -step_size * grad
 
     # returns last accepted path
     return sim_path
