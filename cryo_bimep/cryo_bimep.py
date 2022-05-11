@@ -1,7 +1,6 @@
 "Provides implementation of cryo-BIMEP"
 from typing import Callable, Tuple
 import numpy as np
-from tqdm import tqdm
 
 from cryo_bimep.cryo_bife import CryoBife
 
@@ -43,24 +42,28 @@ class CryoBimep(CryoBife):
         sigma = 0.5
         tol = 1e-2
         paths = np.zeros((steps+1, *initial_path.shape))
+        Log_post = np.zeros(steps)  ##Add by Julian
+        FEPs = [] ##Add by Julian
         paths[0] = initial_path
 
         curr_path = initial_path.copy()
 
-        for i in tqdm(range(steps)):
+        for i in range(steps):
 
-            fe_prof = self.optimizer(curr_path, images, sigma)
-            curr_path = self._simulator(curr_path, fe_prof, self._grad_and_energy_func, 
-                                        self._grad_and_energy_args, *self._sim_args)
+            fe_prof, log_posterior = self.optimizer(curr_path, images, sigma)
+            Log_post[i] = log_posterior ## log_posterior; add by Julian
+            FEPs.append(fe_prof)
 
+            curr_path = self._simulator(curr_path, fe_prof, self._grad_and_energy_func, self._grad_and_energy_args, *self._sim_args)
+            ##curr_path = string_method.run_string_method(curr_path) ##Ya lo hago en el simulador---a menos que lo actualice cada opt_steps y no cada 
             paths[i+1] = curr_path
 
-            if np.sum(abs(paths[i+1] - paths[i]))/initial_path.size < tol:
-                paths = paths[:i+1]
-                break
+            #if np.sum(abs(paths[i+1] - paths[i]))/initial_path.size < tol:
+            #    paths = paths[:i+1]
+            #    break
 
         if paths_fname is not None:
-
+            
             if ".txt" in paths_fname:
                 np.savetxt(f"{paths_fname}", paths)
 
@@ -70,6 +73,9 @@ class CryoBimep(CryoBife):
             else:
                 print(f"Unknown file extension, saving as npy instead")
                 np.save(f"{paths_fname.partition('.')[0]}.npy", paths)
+
+        np.savetxt('Log_posterior_values', Log_post) ## Saving log_posterior values; add by Julian
+        np.savetxt('FEPs', np.array(FEPs)) ## Saving FEPs; add by Julian
 
         return 0
 

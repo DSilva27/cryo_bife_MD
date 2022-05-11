@@ -124,16 +124,40 @@ class CryoBife:
         neg_log_posterior = -(log_likelihood + log_prior)
 
         # Calculate gradient
-        grad = np.zeros_like(path)
+        grad2 = np.zeros_like(path)
 
         weighted_pmat = rho[:,None] * prob_mat.T / np.sum(prob_mat * rho, axis=1)
 
-        grad[:,0] = -1 / sigma**2 * np.sum((images[:,0] - path[:,0][:,None]) *\
+        grad2[:,0] = -1 / sigma**2 * np.sum((images[:,0] - path[:,0][:,None]) *\
                     weighted_pmat, axis=1)
-        grad[:,1] = -1 / sigma**2 * np.sum((images[:,1] - path[:,1][:,None]) *\
+        grad2[:,1] = -1 / sigma**2 * np.sum((images[:,1] - path[:,1][:,None]) *\
                     weighted_pmat, axis=1)
 
-        return neg_log_posterior, grad
+        '''grad = np.zeros_like(path)
+
+        gaussian_center = np.array([[6,6],[13,11],[7,15]]) - 1
+        deepth_wells = np.array([2.27,1.93,1.55])
+        T_inverse = 3
+        w = 0.135 * T_inverse
+
+        norm = deepth_wells[0] * np.exp(-( ( (path[:,0] - gaussian_center[0,0])**2 + (path[:,1] - gaussian_center[0,1])**2 ) / 2*w**2 )) \
+        + deepth_wells[1] * np.exp(-( ( (path[:,0] - gaussian_center[1,0])**2 + (path[:,1] - gaussian_center[1,1])**2 ) / 2*w**2 )) \
+        + deepth_wells[2] * np.exp(-( ( (path[:,0] - gaussian_center[2,0])**2 + (path[:,1] - gaussian_center[2,1])**2 ) / 2*w**2 ))
+
+
+        grad[:,0] = (-deepth_wells[0]*(path[:,0] - gaussian_center[0,0])/w**2) * np.exp(-( ( (path[:,0] - gaussian_center[0,0])**2 + (path[:,1] - gaussian_center[0,1])**2 ) / 2*w**2 )) \
+        + (-deepth_wells[1]*(path[:,0] - gaussian_center[1,0])/w**2) * np.exp(-( ( (path[:,0] - gaussian_center[1,0])**2 + (path[:,1] - gaussian_center[1,1])**2 ) / 2*w**2 )) \
+        + (-deepth_wells[2]*(path[:,0] - gaussian_center[2,0])/w**2) * np.exp(-( ( (path[:,0] - gaussian_center[2,0])**2 + (path[:,1] - gaussian_center[2,1])**2 ) / 2*w**2 ))
+
+
+        grad[:,1] = (-deepth_wells[0]*(path[:,1] - gaussian_center[0,1])/w**2) * np.exp(-( ( (path[:,0] - gaussian_center[0,0])**2 + (path[:,1] - gaussian_center[0,1])**2 ) / 2*w**2 )) \
+        + (-deepth_wells[1]*(path[:,1] - gaussian_center[1,1])/w**2) * np.exp(-( ( (path[:,0] - gaussian_center[1,0])**2 + (path[:,1] - gaussian_center[1,1])**2 ) / 2*w**2 )) \
+        + (-deepth_wells[2]*(path[:,1] - gaussian_center[2,1])/w**2) * np.exp(-( ( (path[:,0] - gaussian_center[2,0])**2 + (path[:,1] - gaussian_center[2,1])**2 ) / 2*w**2 )) 
+
+        for i in range(14):
+            grad[i,:] = grad[i,:]#/norm[i]'''
+
+        return neg_log_posterior, grad2
 
 
     def optimizer(
@@ -168,4 +192,4 @@ class CryoBife:
                                         method='CG',
                                         args=(kappa, prob_mat))
 
-        return optimized_fe_prof.x
+        return (optimized_fe_prof.x,optimized_fe_prof.fun)

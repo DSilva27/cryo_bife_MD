@@ -2,7 +2,9 @@
 from typing import Callable, Tuple
 import numpy as np
 
-def run_stochastic_gd(
+from cryo_bimep.simulators import string_method
+
+def run_string_stochastic(
         initial_path: np.ndarray,
         fe_prof: np.ndarray,
         grad_and_energy_func: Callable,
@@ -43,6 +45,7 @@ def run_stochastic_gd(
     residual_batches = images.shape[0]%batch_size
 
     sim_path = initial_path.copy()
+    sim_path, Norm_tan_vec = string_method.run_string_method(sim_path)
 
     #TODO set this up as a parameter for the simulator (fixed_nodes)
     mask = np.ones_like(sim_path)
@@ -64,17 +67,26 @@ def run_stochastic_gd(
             images_batch = images_shuffled[i*batch_size:(i+1)*batch_size]
 
             __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
-            sim_path += -step_size*grad * mask
+            #sim_path += -step_size*grad * mask
+
+            Perp_grad = [np.dot(Norm_tan_vec.T[0,:],grad[:,0]),np.dot(Norm_tan_vec.T[1,:],grad[:,1])]*Norm_tan_vec
+            #sim_path += step_size*(grad * mask)# - Perp_grad * mask)
+            sim_path += -step_size*(grad * mask - Perp_grad * mask)
 
         if residual_batches != 0:
 
             images_batch = images_shuffled[(number_of_batches-1)*batch_size:]
             __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
-            sim_path += -step_size*grad * mask
+            #sim_path += -step_size*grad * mask
+
+            Perp_grad = [np.dot(Norm_tan_vec.T[0,:],grad[:,0]),np.dot(Norm_tan_vec.T[1,:],grad[:,1])]*Norm_tan_vec
+            #sim_path += step_size*(grad * mask)# - Perp_grad * mask)
+            sim_path += -step_size*(grad * mask - Perp_grad * mask)
 
         if np.sum(abs(sim_path - old_path)) < tol:
             break
 
+        sim_path, Norm_tan_vec = string_method.run_string_method(sim_path)
         old_path = sim_path.copy()
 
     # returns last accepted path
