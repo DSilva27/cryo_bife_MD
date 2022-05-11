@@ -48,22 +48,21 @@ class CryoBimep(CryoBife):
             mpi_params,
             paths_fname = None):
 
+        rank, world_size, comm = mpi_params
+        
         sigma = 0.5
         paths = np.zeros((steps + 1, *initial_path.shape))
         paths[0] = initial_path
 
-        
+        curr_path = initial_path.copy()
 
         for i in tqdm(range(steps)):
 
-            fe_prof = self.optimizer(path_rank, images, sigma, mpi_params)
-            path_rank = self._simulator(path_rank, fe_prof, self._grad_and_energy_func, 
+            fe_prof = self.optimizer(curr_path, images, sigma, mpi_params)
+            #fe_prof = np.random.randn(curr_path.shape[0])
+            curr_path = self._simulator(curr_path, fe_prof, self._grad_and_energy_func,
                                         self._grad_and_energy_args, *self._sim_args)
-            lenghts = np.array(comm.allgather(path_rank.size))
-
-            tmp_path = np.empty((initial_path.size))
-            comm.Allgatherv(path_rank, (tmp_path, lenghts))
-            paths[i+1] = tmp_path.reshape(initial_path.shape)
+            paths[i + 1] = curr_path
 
         if paths_fname is not None and rank == 0:
 
@@ -74,7 +73,7 @@ class CryoBimep(CryoBife):
                 np.save(f"{paths_fname}", paths)
 
             else:
-                print(f"Unknown file extension, saving as npy instead")
+                print("Unknown file extension, saving as npy instead")
                 np.save(f"{paths_fname.partition('.')[0]}.npy", paths)
 
         return paths

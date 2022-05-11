@@ -11,10 +11,10 @@ from mpi4py import MPI
 def energy_and_grad_wrapper(path, fe_prof, images, cbife_args, dist_args):
 
     e_cvife, grad_cvife = CryoBife.grad_and_energy(path, fe_prof, images, *cbife_args)
-    #e_dist, grad_dist = distances.dist_energy_and_grad(path, *dist_args)
+    e_dist, grad_dist = distances.dist_energy_and_grad(path, *dist_args)
 
-    e_total = e_cvife #+ e_dist
-    grad_total = grad_cvife #+ grad_dist
+    e_total = e_cvife + e_dist
+    grad_total = grad_cvife + grad_dist
 
     return e_total, grad_total
 
@@ -31,10 +31,10 @@ def main():
 
     # Set simulator
     images = np.loadtxt("3_well_data/images.txt")
-    gd_steps = 10
+    gd_steps = 100
     gd_step_size = 0.00001
     gd_batch_size = int(images.shape[0] * 0.1)
-    gd_args = (images, gd_steps, gd_step_size, gd_batch_size, comm)
+    gd_args = (mpi_params, images, gd_steps, gd_step_size, gd_batch_size)
     cryo_bimep_obj.set_simulator(stochastic_gd.run_stochastic_gd, gd_args)
 
     # Set grad and energy func
@@ -47,7 +47,7 @@ def main():
     # distance constraint args
     dc_kappa = 1000
     dc_d0 = 0.0
-    dc_args = (dc_kappa, dc_d0)
+    dc_args = (dc_kappa, dc_d0, mpi_params)
 
     # Energy and grad wrapper args
     energy_and_grad_args = (cb_args, dc_args)
@@ -56,25 +56,29 @@ def main():
     # Run path optimization
     # This path has the node in the middle far away from where it's supposed to be
     initial_path = np.loadtxt("3_well_data/initial_path_far_mid_node") - 1
-    initial_path = initial_path[::2]
+    initial_path = initial_path
     print(initial_path.shape)
 
-    assert world_size + 2 == initial_path.shape[0], "Wrong world size"
+    assert (world_size + 2 == initial_path.shape[0]) or (world_size == 1), "Wrong world size"
 
-    opt_steps = 1
+    opt_steps = 10
     opt_fname = "paths_slow.npy"
 
-    print("Starting path optimization using sthochastic gradient descent")
-    print(f"Optimization iteratons: {opt_steps}, gd steps: {gd_steps}")
+    if rank == 0:
+        print("Starting path optimization using sthochastic gradient descent")
+        print(f"Optimization iteratons: {opt_steps}, gd steps: {gd_steps}")
+
     traj = cryo_bimep_obj.path_optimization(initial_path, images, opt_steps, mpi_params, opt_fname)
     #traj = np.load(opt_fname)
 
-    print("Optimization finished")
-    print("*" * 80)
-
-    print("Animating trajectory")
     if rank == 0:
-        animate_simulation(traj, initial_path, images=images, ref_path=np.loadtxt("3_well_data/ref_path") - 1, anim_file="3well_bife_no_const")
+        print("Optimization finished")
+        print("*" * 80)
+
+    if rank == 0:
+        print("Animating trajectory")
+        #animate_simulation(traj, initial_path, images=images, ref_path=np.loadtxt("3_well_data/ref_path") - 1, anim_file="3well_bife_no_const")
+        animate_simulation(traj, initial_path, images=None, ref_path=np.loadtxt("3_well_data/ref_path") - 1, anim_file="3well_bife_no_const")
 
     return 0
 

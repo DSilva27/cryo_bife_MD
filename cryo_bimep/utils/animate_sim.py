@@ -57,7 +57,7 @@ def animate_simulation(traj, initial_path, images=None, ref_path=None, anim_file
 
     # call the animator.  blit=True means only re-draw the parts that have changed.
     anim = animation.FuncAnimation(fig, animate, init_func=init,
-                                frames=traj.shape[0], interval=10000, blit=True, fargs=(traj,), repeat=True)
+                                frames=traj.shape[0], interval=100, blit=True, fargs=(traj,), repeat=True)
 
     # save the animation as an mp4.  This requires ffmpeg or mencoder to be
     # installed.  The extra_args ensure that the x264 codec is used, so that
@@ -65,7 +65,7 @@ def animate_simulation(traj, initial_path, images=None, ref_path=None, anim_file
     # your system: for more information, see
     # http://matplotlib.sourceforge.net/api/animation_api.html
 
-    writergif = animation.PillowWriter(fps=1) 
+    writergif = animation.PillowWriter(fps=15) 
 
     if anim_file is not None:
         anim.save(f'{anim_file}.gif', writer=writergif)

@@ -2,7 +2,7 @@
 from typing import Callable, Tuple
 import numpy as np
 import scipy.optimize as so
-
+from cryo_bimep.utils import prep_for_mpi
 
 class CryoBife:
     """CryoBife provides cryo-bife's prior, likelihood, posterior and
@@ -71,12 +71,12 @@ class CryoBife:
             # Default is the prior from the paper
             prior_fxn = self.integrated_prior
 
-        # TODO: Think for a better name for rho
-        rho = np.exp(-beta * fe_prof) #density vec
-        rho = rho / np.sum(rho) #normalize, Eq.(8)
+        # TODO: Think for a better name for weights
+        weights = np.exp(-beta * fe_prof) #density vec
+        weights = weights / np.sum(weights) #normalize, Eq.(8)
 
         # Sum here since iid images; logsumexp
-        log_likelihood = np.sum(np.log(np.dot(prob_mat, rho)))
+        log_likelihood = np.sum(np.log(np.dot(prob_mat, weights)))
         log_prior = kappa * prior_fxn(fe_prof)
 
         neg_log_posterior = -(log_likelihood + log_prior)
@@ -115,15 +115,18 @@ class CryoBife:
 
         # Setting up numbers of things 
         n_images = images.shape[0]
-        n_nodes = world_size + 2
+        if world_size == 1:
+            n_nodes = path.shape[0]
+        
+        else:
+            n_nodes = world_size + 2
 
         if prior_fxn is None:
             # Default is the prior from the paper
             prior_fxn = CryoBife.integrated_prior
 
-        # TODO: Think for a better name for rho
-        rho = np.exp(-beta * fe_prof) #density vec
-        rho = rho / np.sum(rho) #normalize, Eq.(8)
+        weights = np.exp(-beta * fe_prof)
+        weights /= np.sum(weights)
 
         prob_mat_rank = CryoBife.likelihood(path, images, sigma)
         lenghts = np.array(comm.allgather(prob_mat_rank.size))
@@ -133,7 +136,7 @@ class CryoBife:
         prob_mat = prob_mat.reshape(n_nodes, n_images).T
 
         # Sum here since iid images; logsumexp
-        log_likelihood = np.sum(np.log(np.dot(prob_mat, rho)))
+        log_likelihood = np.sum(np.log(np.dot(prob_mat, weights)))
         log_prior = kappa * prior_fxn(fe_prof)
 
         neg_log_posterior = -(log_likelihood + log_prior)
@@ -141,23 +144,31 @@ class CryoBife:
         # Calculate gradient
         grad = np.zeros_like(path)
 
-        weighted_pmat = rho[:,None] * prob_mat.T / np.sum(prob_mat * rho, axis=1)
+        weighted_pmat = weights[:, None] * prob_mat.T / np.sum(prob_mat * weights, axis=1)
 
-        if rank == 0:
-           
-            grad[1,0] = -1 / sigma**2 * np.sum((images[:,0] - path[1,0]) * weighted_pmat[1,:])
-            grad[1,1] = -1 / sigma**2 * np.sum((images[:,1] - path[1,1]) * weighted_pmat[1,:])
+        if world_size == 1:
 
-        elif rank == world_size - 1:
-            grad[0,0] = -1 / sigma**2 * np.sum((images[:,0] - path[0,0]) * weighted_pmat[-2,:])
-            grad[0,1] = -1 / sigma**2 * np.sum((images[:,1] - path[0,1]) * weighted_pmat[-2,:])
+            grad[:, 0] = -1 / sigma**2 * np.sum((images[:, 0] - path[:, 0][:, None]) * weighted_pmat, axis=1)
+            grad[:, 1] = -1 / sigma**2 * np.sum((images[:, 1] - path[:, 1][:, None]) * weighted_pmat, axis=1)
+
+            grad[0] *= 0.0
+            grad[-1] *= 0.0
 
         else:
-            grad[0,0] = -1 / sigma**2 * np.sum((images[:,0] - path[0,0]) * weighted_pmat[rank + 1,:])
-            grad[0,1] = -1 / sigma**2 * np.sum((images[:,1] - path[0,1]) * weighted_pmat[rank + 1,:])
+            if rank == 0:
+
+                grad[1, 0] = -1 / sigma**2 * np.sum((images[:, 0] - path[1, 0]) * weighted_pmat[1, :])
+                grad[1, 1] = -1 / sigma**2 * np.sum((images[:, 1] - path[1, 1]) * weighted_pmat[1, :])
+
+            elif rank == world_size - 1:
+                grad[0, 0] = -1 / sigma**2 * np.sum((images[:, 0] - path[0, 0]) * weighted_pmat[-2, :])
+                grad[0, 1] = -1 / sigma**2 * np.sum((images[:, 1] - path[0, 1]) * weighted_pmat[-2, :])
+
+            else:
+                grad[0, 0] = -1 / sigma**2 * np.sum((images[:, 0] - path[0, 0]) * weighted_pmat[rank + 1, :])
+                grad[0, 1] = -1 / sigma**2 * np.sum((images[:, 1] - path[0, 1]) * weighted_pmat[rank + 1, :])
 
         return neg_log_posterior, grad
-
 
     def optimizer(
             self,
@@ -182,7 +193,12 @@ class CryoBife:
         rank, world_size, comm = mpi_params
         # Setting up numbers of things 
         n_images = images.shape[0]
-        n_nodes = world_size + 2
+
+        if world_size == 1:
+            n_nodes = path.shape[0]
+        
+        else:
+            n_nodes = world_size + 2
 
         kappa = 1
 
@@ -190,19 +206,27 @@ class CryoBife:
 
             initial_fe_prof = 1.0 * np.random.randn(n_nodes)
 
-        prob_mat_rank = self.likelihood(path, images, sigma)
+        path_rank = prep_for_mpi(path, rank, world_size)
+
+        prob_mat_rank = self.likelihood(path_rank, images, sigma)
         lenghts = np.array(comm.allgather(prob_mat_rank.size))
 
         prob_mat = np.empty((n_images * n_nodes))
         comm.Allgatherv(prob_mat_rank.T.flatten(), (prob_mat, lenghts))
         prob_mat = prob_mat.reshape(n_nodes, n_images).T
 
-        optimized_fe_prof = so.minimize(self.neg_log_posterior,
-                                        initial_fe_prof,
-                                        method='CG',
-                                        args=(kappa, prob_mat))
+        if rank == 0:
+            optimized_fe_prof = so.minimize(self.neg_log_posterior,
+                                            initial_fe_prof,
+                                            method='CG',
+                                            args=(kappa, prob_mat)).x
 
-        return optimized_fe_prof.x
+        else:
+            optimized_fe_prof = np.empty_like(initial_fe_prof)
+
+        comm.bcast(optimized_fe_prof, root=0)
+
+        return optimized_fe_prof
 
 
 class CryoVife(object):
@@ -239,9 +263,9 @@ class CryoVife(object):
         """
         num_nodes = path.shape[0]
 
-        # TODO: Think for a better name for rho
-        rho = np.exp(-beta * fe_prof) #density vec
-        rho = rho / np.sum(rho) #normalize, Eq.(8)
+        # TODO: Think for a better name for weights
+        weights = np.exp(-beta * fe_prof) #density vec
+        weights = weights / np.sum(weights) #normalize, Eq.(8)
         
         path_image_dists = (path - images[:, None])
         variance = sigma**2
@@ -249,11 +273,11 @@ class CryoVife(object):
         log_prob_mat = -np.sum(path_image_dists**2, axis=-1) / (2 * variance)  # Unnormalized, we can add the normalization constant later.
 
         # Sum here since iid images
-        variational_cost = - np.mean(np.dot(log_prob_mat, rho)) + num_nodes * lognorm
-        entropy = np.dot(rho, np.log(rho))
+        variational_cost = - np.mean(np.dot(log_prob_mat, weights)) + num_nodes * lognorm
+        entropy = np.dot(weights, np.log(weights))
         negative_elbo = variational_cost + entropy
 
         # Calculate gradient with respect to nodes 
-        grad = np.mean(path_image_dists, axis=0) * rho.reshape(-1, 1) / (variance)
+        grad = np.mean(path_image_dists, axis=0) * weights.reshape(-1, 1) / (variance)
 
         return negative_elbo, grad
