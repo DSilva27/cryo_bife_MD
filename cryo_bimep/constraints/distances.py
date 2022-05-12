@@ -1,6 +1,8 @@
 "Provides constraint on distances between nodes of the path"
 from typing import Tuple
 import numpy as np
+from cryo_bimep.utils import prep_for_mpi
+
 
 def dist_energy_and_grad(
         path_rank: np.ndarray,
@@ -58,5 +60,7 @@ def dist_energy_and_grad(
 
     comm.bcast(energy_dist, root=0)
     comm.bcast(grad_dist, root=0)
+
+    grad_dist = prep_for_mpi(grad_dist, rank, world_size)
 
     return energy_dist, grad_dist

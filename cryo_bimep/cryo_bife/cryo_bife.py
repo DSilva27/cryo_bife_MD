@@ -1,4 +1,6 @@
 """Provide functions related to Cryo-BIFE"""
+from logging import exception
+from msilib.schema import Error
 from typing import Callable, Tuple
 import numpy as np
 import scipy.optimize as so
@@ -261,6 +263,9 @@ class CryoVife(object):
 
         :returns: Value of the negative log-posterior
         """
+
+        raise Exception("CryoVIFE doesn't work at this moment, please use CryoBife")
+
         num_nodes = path.shape[0]
 
         # TODO: Think for a better name for weights
