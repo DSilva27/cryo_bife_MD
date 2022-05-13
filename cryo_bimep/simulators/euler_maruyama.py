@@ -3,14 +3,16 @@ from typing import Callable, Tuple
 import numpy as np
 from cryo_bimep.utils import prep_for_mpi
 
+
 def run_euler_maruyama(
-        initial_path: np.ndarray,
-        fe_prof: np.ndarray,
-        grad_and_energy_func: Callable,
-        grad_and_energy_args: Tuple,
-        mpi_params,
-        steps: float,
-        step_size: float = 0.0001) -> np.ndarray:
+    initial_path: np.ndarray,
+    fe_prof: np.ndarray,
+    grad_and_energy_func: Callable,
+    grad_and_energy_args: Tuple,
+    mpi_params,
+    steps: float,
+    step_size: float = 0.0001,
+) -> np.ndarray:
     """Run simulation using Euler-Maruyama algorithm.
 
     :param initial_path: Array with the initial values of the free-energy profile in each
@@ -41,7 +43,6 @@ def run_euler_maruyama(
 
         # # Select which coordinate to update
         # path_index = tuple(path_index)
-
 
         # Calculate new proposal
         comm.Barrier()

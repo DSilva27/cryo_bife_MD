@@ -4,12 +4,13 @@ import numpy as np
 
 
 def run_mala(
-        initial_path: np.ndarray,
-        fe_prof: np.ndarray,
-        grad_and_energy_func: Callable,
-        grad_and_energy_args: Tuple,
-        steps: float,
-        step_size: float = 0.0001) -> np.ndarray:
+    initial_path: np.ndarray,
+    fe_prof: np.ndarray,
+    grad_and_energy_func: Callable,
+    grad_and_energy_args: Tuple,
+    steps: float,
+    step_size: float = 0.0001,
+) -> np.ndarray:
     """Run simulation using MALA algorithm.
 
     :param initial_path: Array with the initial values of the free-energy profile in each
@@ -42,15 +43,16 @@ def run_mala(
         path_index = tuple(path_index)
 
         # Calculate new proposal
-        new_path[path_index] += -step_size*old_grad[path_index] +\
-                                              np.sqrt(2*step_size) * np.random.randn()
+        new_path[path_index] += -step_size * old_grad[path_index] + np.sqrt(2 * step_size) * np.random.randn()
         new_energy, new_grad = grad_and_energy_func(new_path, fe_prof, *grad_and_energy_args)
 
         # Calculate hastings ratio
-        hast_ratio = new_energy + np.sum((old_path - new_path + step_size*new_grad)**2 / \
-                                  (4*step_size), axis=1)[path_index[0]] -\
-                     old_energy - np.sum((new_path - old_path + step_size*old_grad)**2 / \
-                                  (4*step_size), axis=1)[path_index[0]]
+        hast_ratio = (
+            new_energy
+            + np.sum((old_path - new_path + step_size * new_grad) ** 2 / (4 * step_size), axis=1)[path_index[0]]
+            - old_energy
+            - np.sum((new_path - old_path + step_size * old_grad) ** 2 / (4 * step_size), axis=1)[path_index[0]]
+        )
 
         hast_ratio = max(0.0, hast_ratio)
 

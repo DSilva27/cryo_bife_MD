@@ -1,6 +1,4 @@
-
-"""Create instructions to build the simSPI package."""
-
+"""Create instructions to build cryo-Bife's path optimization version."""
 import setuptools
 
 requirements = []

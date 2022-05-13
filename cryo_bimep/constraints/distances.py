@@ -5,10 +5,8 @@ from cryo_bimep.utils import prep_for_mpi
 
 
 def dist_energy_and_grad(
-        path_rank: np.ndarray,
-        kappa_2: float,
-        equib_dist: float,
-        mpi_params) -> Tuple[float, np.ndarray]:
+    path_rank: np.ndarray, kappa_2: float, equib_dist: float, mpi_params
+) -> Tuple[float, np.ndarray]:
     """Calculate harmonic distance constraint energy and grad for a path.
 
     :param path: Array with the initial values of the free-energy profile in each
@@ -21,7 +19,7 @@ def dist_energy_and_grad(
 
     # Calculate distances between two or more nodes
     def distance(x1, x2):
-        return np.sqrt(np.sum((x1 - x2)**2, axis=-1))
+        return np.sqrt(np.sum((x1 - x2) ** 2, axis=-1))
 
     rank, world_size, comm = mpi_params
 
@@ -41,16 +39,15 @@ def dist_energy_and_grad(
         path = tmp_path.reshape(n_nodes, path_rank.shape[1])
 
         # Calculate energy
-        energy_dist = np.sum((np.sqrt(np.sum((path[:-1] - path[1:])**2, axis=1)) - equib_dist)**2)
+        energy_dist = np.sum((np.sqrt(np.sum((path[:-1] - path[1:]) ** 2, axis=1)) - equib_dist) ** 2)
         energy_dist *= 0.5 * kappa_2
 
         # Calculate gradient
         grad_dist = np.zeros_like(path)
 
-        grad_dist[1:-1] = (1 - equib_dist / distance(path[1:-1], path[2:])[:,None]) *\
-                          (path[1:-1] - path[2:]) +\
-                          (1 - equib_dist / distance(path[1:-1], path[:-2])[:,None]) *\
-                          (path[1:-1] - path[:-2])
+        grad_dist[1:-1] = (1 - equib_dist / distance(path[1:-1], path[2:])[:, None]) * (path[1:-1] - path[2:]) + (
+            1 - equib_dist / distance(path[1:-1], path[:-2])[:, None]
+        ) * (path[1:-1] - path[:-2])
 
         grad_dist *= kappa_2
 

@@ -3,15 +3,16 @@ Test that the evaluated gradient matches a numerical gradient.
 Can be run using pytest, e.g. `pytest test_gradient.py`.
 """
 
-from mpi4py import MPI
 import numpy as np
-import pytest
+#import pytest
+from pytest_easyMPI import mpi_parallel
 from cryo_bimep.cryo_bife import CryoBife
 from cryo_bimep.utils import prep_for_mpi
 
-
-@pytest.mark.mpi
+@mpi_parallel(4)
 def test_cryo_bife_grad():
+
+    from mpi4py import MPI
     "Test numerically cryo-bife's gradient"
 
     comm = MPI.COMM_WORLD
@@ -36,17 +37,12 @@ def test_cryo_bife_grad():
     test_path_rank = prep_for_mpi(test_path, rank, world_size)
 
     ref_energy, _ = CryoBife.grad_and_energy(
-        test_path_rank,
-        test_fe,
-        test_images,
-        cb_sigma,
-        cb_kappa,
-        mpi_params,
-        cb_beta)
+        test_path_rank, test_fe, test_images, cb_sigma, cb_kappa, mpi_params, cb_beta
+    )
 
     curr_rank = 0
 
-    " First and last nodes are fixed"
+    # First and last nodes are fixed
     for i in range(1, test_path.shape[0] - 1):
         for j in range(test_path.shape[1]):
 
@@ -57,20 +53,15 @@ def test_cryo_bife_grad():
 
             comm.Barrier()
             pert_energy, pert_grad = CryoBife.grad_and_energy(
-                pert_path_rank,
-                test_fe,
-                test_images,
-                cb_sigma,
-                cb_kappa,
-                mpi_params,
-                cb_beta)
+                pert_path_rank, test_fe, test_images, cb_sigma, cb_kappa, mpi_params, cb_beta
+            )
 
             num_grad = (pert_energy - ref_energy) / eps
 
             if curr_rank == 0 and rank == 0:
-                assert np.linalg.norm(num_grad - pert_grad[1,j]) < 1e-5
+                assert np.linalg.norm(num_grad - pert_grad[1, j]) < 1e-5
 
             elif curr_rank == rank:
-                assert np.linalg.norm(num_grad - pert_grad[0,j]) < 1e-5
+                assert np.linalg.norm(num_grad - pert_grad[0, j]) < 1e-5
 
         curr_rank += 1

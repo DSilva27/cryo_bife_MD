@@ -1,14 +1,13 @@
 """Provide functions related to Cryo-BIFE"""
-from logging import exception
-from msilib.schema import Error
 from typing import Callable, Tuple
 import numpy as np
 import scipy.optimize as so
 from cryo_bimep.utils import prep_for_mpi
 
+
 class CryoBife:
     """CryoBife provides cryo-bife's prior, likelihood, posterior and
-    the optimizer as described in doi: 10.1038/s41598-021-92621-1. """
+    the optimizer as described in doi: 10.1038/s41598-021-92621-1."""
 
     @staticmethod
     def integrated_prior(fe_prof: np.ndarray) -> float:
@@ -19,16 +18,13 @@ class CryoBife:
 
         :returns: The value of the prior for the free-energy profile.
         """
-        acc_der_fe_prof = sum(np.diff(fe_prof)**2)
+        acc_der_fe_prof = sum(np.diff(fe_prof) ** 2)
         log_prior = np.log(1 / acc_der_fe_prof**2)
 
         return log_prior
 
     @staticmethod
-    def likelihood(
-            path: np.ndarray,
-            images: np.ndarray,
-            sigma: float) -> np.ndarray:
+    def likelihood(path: np.ndarray, images: np.ndarray, sigma: float) -> np.ndarray:
         """Calculate cryo-bife's likelihood matrix given a path and a dataset of images
 
         :param path: Array with the values of the variables at each node of the path.
@@ -46,18 +42,13 @@ class CryoBife:
         prob_matrix = np.zeros((number_of_images, number_of_nodes))
 
         norm = 1 / (2 * np.pi * sigma**2)
-        prob_matrix = norm * np.exp(-0.5 * 1/sigma**2 *\
-                                    np.sum((path[:,None] - images)**2, axis=-1)).T
+        prob_matrix = norm * np.exp(-0.5 * 1 / sigma**2 * np.sum((path[:, None] - images) ** 2, axis=-1)).T
 
         return prob_matrix
 
     def neg_log_posterior(
-            self,
-            fe_prof: np.ndarray,
-            kappa: float,
-            prob_mat: np.ndarray,
-            beta: float = 1,
-            prior_fxn: Callable = None) -> float:
+        self, fe_prof: np.ndarray, kappa: float, prob_mat: np.ndarray, beta: float = 1, prior_fxn: Callable = None
+    ) -> float:
         """Calculate cryo-bife's negative log-posterior.
 
         :param fe_prof: Array with the values of the free-energy profile (FEP)
@@ -74,8 +65,8 @@ class CryoBife:
             prior_fxn = self.integrated_prior
 
         # TODO: Think for a better name for weights
-        weights = np.exp(-beta * fe_prof) #density vec
-        weights = weights / np.sum(weights) #normalize, Eq.(8)
+        weights = np.exp(-beta * fe_prof)  # density vec
+        weights = weights / np.sum(weights)  # normalize, Eq.(8)
 
         # Sum here since iid images; logsumexp
         log_likelihood = np.sum(np.log(np.dot(prob_mat, weights)))
@@ -87,14 +78,15 @@ class CryoBife:
 
     @staticmethod
     def grad_and_energy(
-            path: np.ndarray,
-            fe_prof: np.ndarray,
-            images: np.ndarray,
-            sigma: float,
-            kappa: float,
-            mpi_params: Tuple,
-            beta: float = 1,
-            prior_fxn: Callable = None) -> Tuple[float, np.ndarray]:
+        path: np.ndarray,
+        fe_prof: np.ndarray,
+        images: np.ndarray,
+        sigma: float,
+        kappa: float,
+        mpi_params: Tuple,
+        beta: float = 1,
+        prior_fxn: Callable = None,
+    ) -> Tuple[float, np.ndarray]:
         """Calculate cryo-bife's negative log-posterior.
 
         :param path: Array with the values of the variables at each node of the path.
@@ -115,11 +107,11 @@ class CryoBife:
         # Setting up parallel stuff
         rank, world_size, comm = mpi_params
 
-        # Setting up numbers of things 
+        # Setting up numbers of things
         n_images = images.shape[0]
         if world_size == 1:
             n_nodes = path.shape[0]
-        
+
         else:
             n_nodes = world_size + 2
 
@@ -173,12 +165,8 @@ class CryoBife:
         return neg_log_posterior, grad
 
     def optimizer(
-            self,
-            path: np.ndarray,
-            images: np.ndarray,
-            sigma: float,
-            mpi_params: Tuple,
-            initial_fe_prof: np.ndarray = None) -> np.ndarray:
+        self, path: np.ndarray, images: np.ndarray, sigma: float, mpi_params: Tuple, initial_fe_prof: np.ndarray = None
+    ) -> np.ndarray:
         """Find the optimal free-energy profile given a path and a dataset of images
 
         :param path: Array with the values of the variables at each node of the path.
@@ -193,12 +181,12 @@ class CryoBife:
 
         # Setting up parallel stuff
         rank, world_size, comm = mpi_params
-        # Setting up numbers of things 
+        # Setting up numbers of things
         n_images = images.shape[0]
 
         if world_size == 1:
             n_nodes = path.shape[0]
-        
+
         else:
             n_nodes = world_size + 2
 
@@ -218,10 +206,9 @@ class CryoBife:
         prob_mat = prob_mat.reshape(n_nodes, n_images).T
 
         if rank == 0:
-            optimized_fe_prof = so.minimize(self.neg_log_posterior,
-                                            initial_fe_prof,
-                                            method='CG',
-                                            args=(kappa, prob_mat)).x
+            optimized_fe_prof = so.minimize(
+                self.neg_log_posterior, initial_fe_prof, method="CG", args=(kappa, prob_mat)
+            ).x
 
         else:
             optimized_fe_prof = np.empty_like(initial_fe_prof)
@@ -239,17 +226,13 @@ class CryoVife(object):
         self.beta = beta
 
     def __call__(self, path, fe_prof):
-        return CryoVIFE.grad_and_energy(path, fe_prof, self.images, 
-                                        self.sigma, self.beta)
+        return CryoVIFE.grad_and_energy(path, fe_prof, self.images, self.sigma, self.beta)
 
     @staticmethod
     def grad_and_energy(
-            path: np.ndarray,
-            fe_prof: np.ndarray,
-            images: np.ndarray,
-            sigma: float,
-            beta: float = 1) -> Tuple[float, np.ndarray]:
-        """Calculate loss function for VI. 
+        path: np.ndarray, fe_prof: np.ndarray, images: np.ndarray, sigma: float, beta: float = 1
+    ) -> Tuple[float, np.ndarray]:
+        """Calculate loss function for VI.
 
         :param path: Array with the values of the variables at each node of the path.
                      Shape must be (n_models, n_dimensions).
@@ -264,25 +247,27 @@ class CryoVife(object):
         :returns: Value of the negative log-posterior
         """
 
-        raise Exception("CryoVIFE doesn't work at this moment, please use CryoBife")
+        # raise Exception("CryoVIFE doesn't work at this moment, please use CryoBife")
 
         num_nodes = path.shape[0]
 
         # TODO: Think for a better name for weights
-        weights = np.exp(-beta * fe_prof) #density vec
-        weights = weights / np.sum(weights) #normalize, Eq.(8)
-        
-        path_image_dists = (path - images[:, None])
+        weights = np.exp(-beta * fe_prof)  # density vec
+        weights = weights / np.sum(weights)  # normalize, Eq.(8)
+
+        path_image_dists = path - images[:, None]
         variance = sigma**2
         lognorm = -np.log(2 * np.pi * variance)
-        log_prob_mat = -np.sum(path_image_dists**2, axis=-1) / (2 * variance)  # Unnormalized, we can add the normalization constant later.
+        log_prob_mat = -np.sum(path_image_dists**2, axis=-1) / (
+            2 * variance
+        )  # Unnormalized, we can add the normalization constant later.
 
         # Sum here since iid images
-        variational_cost = - np.mean(np.dot(log_prob_mat, weights)) + num_nodes * lognorm
+        variational_cost = -np.mean(np.dot(log_prob_mat, weights)) + num_nodes * lognorm
         entropy = np.dot(weights, np.log(weights))
         negative_elbo = variational_cost + entropy
 
-        # Calculate gradient with respect to nodes 
+        # Calculate gradient with respect to nodes
         grad = np.mean(path_image_dists, axis=0) * weights.reshape(-1, 1) / (variance)
 
         return negative_elbo, grad

@@ -5,15 +5,16 @@ from cryo_bimep.utils import prep_for_mpi
 
 
 def run_stochastic_gd(
-        initial_path: np.ndarray,
-        fe_prof: np.ndarray,
-        grad_and_energy_func: Callable,
-        grad_and_energy_args: Tuple,
-        mpi_params,
-        images: np.ndarray,
-        steps: float,
-        step_size: float = 0.0001,
-        batch_size: int = None) -> np.ndarray:
+    initial_path: np.ndarray,
+    fe_prof: np.ndarray,
+    grad_and_energy_func: Callable,
+    grad_and_energy_args: Tuple,
+    mpi_params,
+    images: np.ndarray,
+    steps: float,
+    step_size: float = 0.0001,
+    batch_size: int = None,
+) -> np.ndarray:
     """Run simulation using stochastic gradient descent.
 
     Parameters
@@ -63,7 +64,7 @@ def run_stochastic_gd(
 
         for i in range(number_of_batches):
 
-            images_batch = images_shuffled[i * batch_size: (i + 1) * batch_size]
+            images_batch = images_shuffled[i * batch_size : (i + 1) * batch_size]
 
             comm.Barrier()
             __, grad = grad_and_energy_func(path_rank, fe_prof, images_batch, *grad_and_energy_args)
@@ -71,7 +72,7 @@ def run_stochastic_gd(
 
         if residual_batches != 0:
 
-            images_batch = images_shuffled[(number_of_batches - 1) * batch_size:]
+            images_batch = images_shuffled[(number_of_batches - 1) * batch_size :]
 
             comm.Barrier()
             __, grad = grad_and_energy_func(path_rank, fe_prof, images_batch, *grad_and_energy_args)

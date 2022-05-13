@@ -8,6 +8,7 @@ from cryo_bimep.utils import animate_simulation
 
 from mpi4py import MPI
 
+
 def energy_and_grad_wrapper(path, fe_prof, images, cbife_args, dist_args):
 
     e_cvife, grad_cvife = CryoBife.grad_and_energy(path, fe_prof, images, *cbife_args)
@@ -45,7 +46,7 @@ def main():
     cb_args = (cb_sigma, cb_kappa, mpi_params, cb_beta)
 
     # distance constraint args
-    dc_kappa = 1000
+    dc_kappa = 1000 * 0
     dc_d0 = 0.0
     dc_args = (dc_kappa, dc_d0, mpi_params)
 
@@ -56,8 +57,6 @@ def main():
     # Run path optimization
     # This path has the node in the middle far away from where it's supposed to be
     initial_path = np.loadtxt("3_well_data/initial_path_far_mid_node") - 1
-    initial_path = initial_path
-    print(initial_path.shape)
 
     assert (world_size + 2 == initial_path.shape[0]) or (world_size == 1), "Wrong world size"
 
@@ -69,7 +68,7 @@ def main():
         print(f"Optimization iteratons: {opt_steps}, gd steps: {gd_steps}")
 
     traj = cryo_bimep_obj.path_optimization(initial_path, images, opt_steps, mpi_params, opt_fname)
-    #traj = np.load(opt_fname)
+    # traj = np.load(opt_fname)
 
     if rank == 0:
         print("Optimization finished")
@@ -77,8 +76,14 @@ def main():
 
     if rank == 0:
         print("Animating trajectory")
-        #animate_simulation(traj, initial_path, images=images, ref_path=np.loadtxt("3_well_data/ref_path") - 1, anim_file="3well_bife_no_const")
-        animate_simulation(traj, initial_path, images=None, ref_path=np.loadtxt("3_well_data/ref_path") - 1, anim_file="3well_bife_no_const")
+        # animate_simulation(traj, initial_path, images=images, ref_path=np.loadtxt("3_well_data/ref_path") - 1, anim_file="3well_bife_no_const")
+        animate_simulation(
+            traj,
+            initial_path,
+            images=None,
+            ref_path=np.loadtxt("3_well_data/ref_path") - 1,
+            anim_file="3well_bife_no_const",
+        )
 
     return 0
 
