@@ -49,10 +49,10 @@ def run_string_method(initial_path):
     
     reparam_curve = [[Cspline1(Cv2)[0],Cspline2(Cv2)[0]]] #First node fixed
 
-    der_x_der_alpha = np.array(np.diff(Cspline1(Cv2))/np.diff(Cv2))
-    der_y_der_alpha = np.array(np.diff(Cspline2(Cv2))/np.diff(Cv2))
+    #der_x_der_alpha = np.array(np.diff(Cspline1(Cv2))/np.diff(Cv2))
+    #der_y_der_alpha = np.array(np.diff(Cspline2(Cv2))/np.diff(Cv2))
     
-    Tan_vec = np.array([der_x_der_alpha,der_y_der_alpha]).T
+    Tan_vec = Tan_vec = np.array([Cspline1(Cv2,1),Cspline2(Cv2,2)]).T
     Norm_Tan_vec = [[0,0]] #First node derivative
 
     for i in New_nodes:
