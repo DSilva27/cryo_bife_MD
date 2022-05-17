@@ -12,7 +12,7 @@ def energy_and_grad_wrapper(path, fe_prof, images, cbife_args, dist_args):
     e_dist, grad_dist = distances.dist_energy_and_grad(path, *dist_args)
 
     e_total = e_cbife + 0*e_dist
-    grad_total = grad_cbife + grad_dist
+    grad_total = grad_cbife + 0*grad_dist
 
     return e_total, grad_total
 
