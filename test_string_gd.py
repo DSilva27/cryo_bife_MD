@@ -24,7 +24,7 @@ def main():
     # images = np.loadtxt("example_data/2-wells_images.txt")
     images = np.loadtxt("example_data/images.txt")
     gd_steps = 10 #100
-    gd_step_size = 0.0001
+    gd_step_size = 0.0001/2
     gd_batch_size = int(images.shape[0] * 0.1)
     gd_args = (images, gd_steps, gd_step_size, gd_batch_size)
     #cryo_bimep_obj.set_simulator(stochastic_gd.run_stochastic_gd, gd_args)
@@ -38,8 +38,8 @@ def main():
     cb_args = (cb_sigma, cb_beta, cb_kappa)
 
     # distance constraint args
-    dc_kappa = 200
-    dc_d0 = 0#0.5
+    dc_kappa = 0*200
+    dc_d0 = 0*0.5
     dc_args = (dc_kappa, dc_d0)
 
     # Energy and grad wrapper args
@@ -52,7 +52,7 @@ def main():
     
     initial_path = np.loadtxt("example_data/Orange") - 1
     #initial_path = np.loadtxt("example_data/O3") - 1
-    opt_steps = 300 #1500
+    opt_steps = 1500
     opt_fname = "string_paths_sgd_toy_system.npy"
 
     #String_path, _dummy = string_method.run_string_method(initial_path)
