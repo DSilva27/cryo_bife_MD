@@ -52,7 +52,7 @@ def run_string_method(initial_path):
     #der_x_der_alpha = np.array(np.diff(Cspline1(Cv2))/np.diff(Cv2))
     #der_y_der_alpha = np.array(np.diff(Cspline2(Cv2))/np.diff(Cv2))
     
-    Tan_vec = Tan_vec = np.array([Cspline1(Cv2,1),Cspline2(Cv2,2)]).T
+    Tan_vec = Tan_vec = np.array([Cspline1(Cv2,1),Cspline2(Cv2,1)]).T
     Norm_Tan_vec = [[0,0]] #First node derivative
 
     for i in New_nodes:
