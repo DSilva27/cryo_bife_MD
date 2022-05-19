@@ -48,15 +48,15 @@ class CryoBimep(CryoBife):
         for i in tqdm(range(steps)):
 
             fe_prof = self.optimizer(curr_path, images, sigma, mpi_params)
-            # fe_prof = np.random.randn(curr_path.shape[0])
+            
             curr_path = self._simulator(
                 curr_path, fe_prof, self._grad_and_energy_func, self._grad_and_energy_args, *self._sim_args
             )
 
-            if rank == 0:
-                curr_path = run_string_method(curr_path)
+            # if rank == 0:
+            #     curr_path = run_string_method(curr_path)
 
-            comm.bcast(curr_path, root=0)
+            # comm.bcast(curr_path, root=0)
 
             paths[i + 1] = curr_path
 

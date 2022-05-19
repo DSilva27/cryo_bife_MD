@@ -3,7 +3,7 @@ import numpy as np
 from cryo_bimep import CryoBimep
 from cryo_bimep.cryo_bife import CryoBife
 from cryo_bimep.constraints import distances
-from cryo_bimep.simulators import stochastic_gd
+from cryo_bimep.simulators import stochastic_gd_string
 from cryo_bimep.utils import animate_simulation
 
 from mpi4py import MPI
@@ -36,7 +36,7 @@ def main():
     gd_step_size = 0.00001
     gd_batch_size = int(images.shape[0] * 0.1)
     gd_args = (mpi_params, images, gd_steps, gd_step_size, gd_batch_size)
-    cryo_bimep_obj.set_simulator(stochastic_gd.run_stochastic_gd, gd_args)
+    cryo_bimep_obj.set_simulator(stochastic_gd_string.run_stochastic_gd_string, gd_args)
 
     # Set grad and energy func
     # cryo_bife args
