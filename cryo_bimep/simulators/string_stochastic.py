@@ -70,8 +70,8 @@ def run_string_stochastic(
             #sim_path += -step_size*grad * mask
 
             Perp_grad = [np.dot(Norm_tan_vec.T[0,:],grad[:,0]),np.dot(Norm_tan_vec.T[1,:],grad[:,1])]*Norm_tan_vec
-            #sim_path += step_size*(grad * mask)# - Perp_grad * mask)
-            sim_path += -step_size*(grad * mask - Perp_grad * mask)
+            sim_path += step_size*(grad * mask)
+            #sim_path += -step_size*(grad * mask - Perp_grad * mask)
 
         if residual_batches != 0:
 
@@ -80,8 +80,8 @@ def run_string_stochastic(
             #sim_path += -step_size*grad * mask
 
             Perp_grad = [np.dot(Norm_tan_vec.T[0,:],grad[:,0]),np.dot(Norm_tan_vec.T[1,:],grad[:,1])]*Norm_tan_vec
-            #sim_path += step_size*(grad * mask)# - Perp_grad * mask)
-            sim_path += -step_size*(grad * mask - Perp_grad * mask)
+            sim_path += step_size*(grad * mask)
+            #sim_path += -step_size*(grad * mask - Perp_grad * mask)
 
         if np.sum(abs(sim_path - old_path)) < tol:
             break
