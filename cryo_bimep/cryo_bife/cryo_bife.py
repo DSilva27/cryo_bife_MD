@@ -36,19 +36,16 @@ class CryoBife:
         grid = np.arange(grid_min, grid_max, pixel_size)
         image = np.zeros((n_pixels, n_pixels))
 
-        gauss = np.exp(-0.5 * (((grid[:, None] - coord[0, :]) / sigma)**2))[:, None] *\
-                np.exp(-0.5 * (((grid[:, None] - coord[1, :]) / sigma)**2))
+        gauss = np.exp(-0.5 * (((grid[:, None] - coord[0, :]) / sigma) ** 2))[:, None] * np.exp(
+            -0.5 * (((grid[:, None] - coord[1, :]) / sigma) ** 2)
+        )
 
         image = gauss.sum(axis=2) * norm
 
         return image
 
     @staticmethod
-    def likelihood(
-            path: np.ndarray,
-            images: np.ndarray,
-            img_params,
-            sigma: float) -> np.ndarray:
+    def likelihood(path: np.ndarray, images: np.ndarray, img_params, sigma: float) -> np.ndarray:
         """Calculate cryo-bife's likelihood matrix given a path and a dataset of images
 
         :param path: Array with the values of the variables at each node of the path.
@@ -71,11 +68,11 @@ class CryoBife:
 
         for i in range(number_of_images):
             for j in range(number_of_nodes):
-                
+
                 coord_rot = np.matmul(images[i]["Q"], path[j])
                 img_calc = CryoBife.gen_img(coord_rot, n_pixels, pixel_size, sigma_img)
 
-                prob_matrix[i, j] = -np.sum((images[i]["I"] - img_calc)**2) / (2 * sigma**2)
+                prob_matrix[i, j] = -np.sum((images[i]["I"] - img_calc) ** 2) / (2 * sigma**2)
 
         prob_matrix += np.log(norm)
         return prob_matrix
@@ -151,14 +148,14 @@ class CryoBife:
         else:
             n_nodes = world_size + 2
 
-        # Calculate constants 
+        # Calculate constants
         n_pixels, pixel_size, sigma_img = img_params
         norm_grad = 1 / (2 * np.pi * sigma_img**4 * sigma**2 * n_atoms)
 
         grid_min = -pixel_size * (n_pixels - 1) * 0.5
         grid_max = pixel_size * (n_pixels - 1) * 0.5 + pixel_size
         grid = np.arange(grid_min, grid_max, pixel_size)
-        
+
         if prior_fxn is None:
             # Default is the prior from the paper
             prior_fxn = CryoBife.integrated_prior
@@ -190,15 +187,21 @@ class CryoBife:
 
             for i in range(1, n_nodes - 1):
 
-                gaussians = np.exp(-0.5 * (((grid[:, None] - path[i][0, :])**2 / sigma_img**2)[:, None] + (grid[:, None] - path[i][1, :])**2 / sigma_img**2))
+                gaussians = np.exp(
+                    -0.5
+                    * (
+                        ((grid[:, None] - path[i][0, :]) ** 2 / sigma_img**2)[:, None]
+                        + (grid[:, None] - path[i][1, :]) ** 2 / sigma_img**2
+                    )
+                )
 
-                der_gaussians_x = (grid[:, None] - path[i][0, :])
-                der_gaussians_y = (grid[:, None] - path[i][1, :])
+                der_gaussians_x = grid[:, None] - path[i][0, :]
+                der_gaussians_y = grid[:, None] - path[i][1, :]
                 img_node = CryoBife.gen_img(path[i], *img_params)
 
                 for j in range(n_images):
 
-                    #node_rot = np.matmul(images[j]["Q"], path[i])
+                    # node_rot = np.matmul(images[j]["Q"], path[i])
 
                     dif_images = images[j]["I"] - img_node
 
@@ -208,22 +211,28 @@ class CryoBife:
                     grad_tmp[0] *= norm_grad * prob_mat[j, i]
                     grad_tmp[1] *= norm_grad * prob_mat[j, i]
 
-                    #grad_tmp = np.matmul(images[j]["Q_inv"], grad_tmp)
+                    # grad_tmp = np.matmul(images[j]["Q_inv"], grad_tmp)
 
                     grad[i, :] += grad_tmp * weights[i] * weighted_pmat[j]
 
         else:
             if rank == 0:
 
-                gaussians = np.exp(-0.5 * (((grid[:, None] - path[1][0, :])**2 / sigma_img**2)[:, None] + (grid[:, None] - path[1][1, :])**2 / sigma_img**2))
+                gaussians = np.exp(
+                    -0.5
+                    * (
+                        ((grid[:, None] - path[1][0, :]) ** 2 / sigma_img**2)[:, None]
+                        + (grid[:, None] - path[1][1, :]) ** 2 / sigma_img**2
+                    )
+                )
 
-                der_gaussians_x = (grid[:, None] - path[1][0, :])
-                der_gaussians_y = (grid[:, None] - path[1][1, :])
+                der_gaussians_x = grid[:, None] - path[1][0, :]
+                der_gaussians_y = grid[:, None] - path[1][1, :]
                 img_node = CryoBife.gen_img(path[1], *img_params)
 
                 for j in range(n_images):
 
-                    #node_rot = np.matmul(images[j]["Q"], path[i])
+                    # node_rot = np.matmul(images[j]["Q"], path[i])
 
                     dif_images = images[j]["I"] - img_node
 
@@ -233,21 +242,27 @@ class CryoBife:
                     grad_tmp[0] *= norm_grad * prob_mat[j, 1]
                     grad_tmp[1] *= norm_grad * prob_mat[j, 1]
 
-                    #grad_tmp = np.matmul(images[j]["Q_inv"], grad_tmp)
+                    # grad_tmp = np.matmul(images[j]["Q_inv"], grad_tmp)
 
                     grad[1, :] += grad_tmp * weights[1] * weighted_pmat[j]
 
             else:
 
-                gaussians = np.exp(-0.5 * (((grid[:, None] - path[0][0, :])**2 / sigma_img**2)[:, None] + (grid[:, None] - path[0][1, :])**2 / sigma_img**2))
+                gaussians = np.exp(
+                    -0.5
+                    * (
+                        ((grid[:, None] - path[0][0, :]) ** 2 / sigma_img**2)[:, None]
+                        + (grid[:, None] - path[0][1, :]) ** 2 / sigma_img**2
+                    )
+                )
 
-                der_gaussians_x = (grid[:, None] - path[0][0, :])
-                der_gaussians_y = (grid[:, None] - path[0][1, :])
+                der_gaussians_x = grid[:, None] - path[0][0, :]
+                der_gaussians_y = grid[:, None] - path[0][1, :]
                 img_node = CryoBife.gen_img(path[0], *img_params)
 
                 for j in range(n_images):
 
-                    #node_rot = np.matmul(images[j]["Q"], path[i])
+                    # node_rot = np.matmul(images[j]["Q"], path[i])
 
                     dif_images = images[j]["I"] - img_node
 
@@ -257,12 +272,11 @@ class CryoBife:
                     grad_tmp[0] *= norm_grad * prob_mat[j, 1]
                     grad_tmp[1] *= norm_grad * prob_mat[j, 1]
 
-                    #grad_tmp = np.matmul(images[j]["Q_inv"], grad_tmp)
+                    # grad_tmp = np.matmul(images[j]["Q_inv"], grad_tmp)
 
                     grad[0, :] += grad_tmp * weights[rank + 1] * weighted_pmat[j]
 
         return cryo_bife_energy, grad
-
 
     def optimizer(
         self, path: np.ndarray, images: np.ndarray, sigma: float, mpi_params: Tuple, initial_fe_prof: np.ndarray = None
