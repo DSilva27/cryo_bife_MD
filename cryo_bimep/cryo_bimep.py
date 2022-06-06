@@ -40,8 +40,10 @@ class CryoBimep(CryoBife):
         rank, world_size, comm = mpi_params
 
         sigma = 0.5
-        paths = np.zeros((steps + 1, *initial_path.shape))
-        paths[0] = initial_path
+
+        if rank == 0:
+            paths = np.zeros(((steps + 1) * 100, *initial_path.shape))
+            paths[0] = initial_path
 
         curr_path = initial_path.copy()
 
@@ -49,16 +51,25 @@ class CryoBimep(CryoBife):
 
             fe_prof = self.optimizer(curr_path, images, sigma, mpi_params)
             
-            curr_path = self._simulator(
-                curr_path, fe_prof, self._grad_and_energy_func, self._grad_and_energy_args, *self._sim_args
-            )
+            if rank == 0:
+
+                paths[100 * i + 1:100 * (i + 1) + 1] = self._simulator(
+                    curr_path, fe_prof, self._grad_and_energy_func, self._grad_and_energy_args, *self._sim_args
+                )
+                
+                curr_path = paths[100 * (i + 1)]
+
+            else:
+
+                curr_path = self._simulator(
+                    curr_path, fe_prof, self._grad_and_energy_func, self._grad_and_energy_args, *self._sim_args
+                )
+                
 
             # if rank == 0:
             #     curr_path = run_string_method(curr_path)
 
             # comm.bcast(curr_path, root=0)
-
-            paths[i + 1] = curr_path
 
         if paths_fname is not None and rank == 0:
 

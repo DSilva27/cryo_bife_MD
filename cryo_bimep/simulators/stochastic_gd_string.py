@@ -62,6 +62,9 @@ def run_stochastic_gd_string(
 
     images_shuffled = images.copy()
 
+    if rank == 0:
+        trajectory = []
+
     for _ in range(steps):
 
         if rank == 0:
@@ -100,6 +103,7 @@ def run_stochastic_gd_string(
 
         if rank == 0:
             sim_path, tangent_to_path = run_string_method(sim_path)
+            trajectory.append(sim_path)
 
         comm.bcast(sim_path, root=0)
         comm.bcast(tangent_to_path, root=0)
@@ -108,4 +112,6 @@ def run_stochastic_gd_string(
         tang_to_path_rank = prep_for_mpi(tangent_to_path, rank, world_size)
 
     # returns last accepted path
-    return sim_path
+
+    if rank == 0:
+        return np.array(trajectory)

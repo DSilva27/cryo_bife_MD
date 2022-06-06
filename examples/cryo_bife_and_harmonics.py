@@ -46,7 +46,7 @@ def main():
     cb_args = (cb_sigma, cb_kappa, mpi_params, cb_beta)
 
     # distance constraint args
-    dc_kappa = 1000 * 0
+    dc_kappa = 100
     dc_d0 = 0.0
     dc_args = (dc_kappa, dc_d0, mpi_params)
 
@@ -56,12 +56,13 @@ def main():
 
     # Run path optimization
     # This path has the node in the middle far away from where it's supposed to be
-    initial_path = np.loadtxt("3_well_data/initial_path_far_mid_node") - 1
+    #initial_path = np.loadtxt("3_well_data/initial_path_far_mid_node") - 1
+    initial_path = np.load("tight_path.npy")
 
     assert (world_size + 2 == initial_path.shape[0]) or (world_size == 1), "Wrong world size"
 
     opt_steps = 10
-    opt_fname = "paths_slow.npy"
+    opt_fname = f"traj_bife_and_harm_{dc_kappa}.npy"
 
     if rank == 0:
         print("Starting path optimization using sthochastic gradient descent")
@@ -82,7 +83,7 @@ def main():
             initial_path,
             images=None,
             ref_path=np.loadtxt("3_well_data/ref_path") - 1,
-            anim_file="3well_bife_no_const",
+            anim_file=f"traj_bife_and_harm_{dc_kappa}",
         )
 
     return 0
