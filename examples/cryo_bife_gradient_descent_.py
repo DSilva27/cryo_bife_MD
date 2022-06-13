@@ -29,8 +29,9 @@ cryo_bife_obj = CryoBife()
 initial_path = np.loadtxt("3_well_data/initial_path_far_mid_node") - 1
 images = np.loadtxt("3_well_data/images.txt")
 cb_sigma = 0.5
-cb_grad_energy_args = (0.5, 1, 1)
-
+cb_kappa = 1
+cb_beta = 1
+cb_grad_energy_args = (cb_sigma, cb_kappa, cb_beta)
 fe_prof = None
 
 opt_steps = 1
