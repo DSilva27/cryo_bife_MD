@@ -1,12 +1,9 @@
 """Provide Brownian motion simulator for path optimization with cryo-bife"""
-from typing import Tuple
 import numpy as np
-from cryo_bimep.utils import prep_for_mpi
 
 
 def run_brownian_sim(
     initial_path: np.ndarray,
-    mpi_params: Tuple,
     steps: float,
     step_size: float = 0.0001,
 ) -> np.ndarray:
@@ -22,21 +19,15 @@ def run_brownian_sim(
 
     :returns: Last accepted path
     """
-    # Set up MPI stuff
-    rank, world_size, comm = mpi_params
 
     # Calculate "old" variables
     sim_path = initial_path.copy()
-    path_rank = prep_for_mpi(sim_path, rank, world_size)
+    trajectory = np.zeros((steps, *initial_path.shape))
 
-    for _ in range(steps):
+    for step in range(steps):
 
-        path_rank += np.sqrt(2 * step_size) * np.random.randn(*path_rank.shape)
+        sim_path[1:-1] += np.sqrt(2 * step_size) * np.random.randn(*sim_path[1:-1].shape)
 
-    lenghts = np.array(comm.allgather(path_rank.size))
-    tmp_path = np.empty((initial_path.size))
+        trajectory[step] = sim_path
 
-    comm.Allgatherv(path_rank, (tmp_path, lenghts))
-    sim_path = tmp_path.reshape(initial_path.shape)
-
-    return sim_path
+    return trajectory

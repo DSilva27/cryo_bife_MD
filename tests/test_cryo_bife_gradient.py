@@ -4,15 +4,18 @@ Can be run using pytest, e.g. `pytest test_gradient.py`.
 """
 
 import numpy as np
-#import pytest
+
+# import pytest
 from pytest_easyMPI import mpi_parallel
 from cryo_bimep.cryo_bife import CryoBife
 from cryo_bimep.utils import prep_for_mpi
+
 
 @mpi_parallel(1)
 def test_cryo_bife_grad():
 
     from mpi4py import MPI
+
     "Test numerically cryo-bife's gradient"
 
     comm = MPI.COMM_WORLD
@@ -62,8 +65,10 @@ def test_cryo_bife_grad():
 
     assert np.allclose(num_grad, an_grad)
 
+
 def main():
 
     test_cryo_bife_grad()
+
 
 main()

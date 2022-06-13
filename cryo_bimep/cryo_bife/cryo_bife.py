@@ -2,7 +2,6 @@
 from typing import Callable, Tuple
 import numpy as np
 import scipy.optimize as so
-from cryo_bimep.utils import prep_for_mpi
 
 
 class CryoBife:
@@ -46,7 +45,7 @@ class CryoBife:
 
         return prob_matrix
 
-    def neg_log_posterior(
+    def energy(
         self, fe_prof: np.ndarray, kappa: float, prob_mat: np.ndarray, beta: float = 1, prior_fxn: Callable = None
     ) -> float:
         """Calculate cryo-bife's negative log-posterior.
@@ -72,9 +71,9 @@ class CryoBife:
         log_likelihood = np.sum(np.log(np.dot(prob_mat, weights)))
         log_prior = kappa * prior_fxn(fe_prof)
 
-        neg_log_posterior = -(log_likelihood + log_prior)
+        energy = -(log_likelihood + log_prior)
 
-        return neg_log_posterior
+        return energy
 
     @staticmethod
     def grad_and_energy(
@@ -83,7 +82,6 @@ class CryoBife:
         images: np.ndarray,
         sigma: float,
         kappa: float,
-        mpi_params: Tuple,
         beta: float = 1,
         prior_fxn: Callable = None,
     ) -> Tuple[float, np.ndarray]:
@@ -104,17 +102,6 @@ class CryoBife:
         :returns: Value of the negative log-posterior
         """
 
-        # Setting up parallel stuff
-        rank, world_size, comm = mpi_params
-
-        # Setting up numbers of things
-        n_images = images.shape[0]
-        if world_size == 1:
-            n_nodes = path.shape[0]
-
-        else:
-            n_nodes = world_size + 2
-
         if prior_fxn is None:
             # Default is the prior from the paper
             prior_fxn = CryoBife.integrated_prior
@@ -122,50 +109,29 @@ class CryoBife:
         weights = np.exp(-beta * fe_prof)
         weights /= np.sum(weights)
 
-        prob_mat_rank = CryoBife.likelihood(path, images, sigma)
-        lenghts = np.array(comm.allgather(prob_mat_rank.size))
-
-        prob_mat = np.empty((n_images * n_nodes))
-        comm.Allgatherv(prob_mat_rank.T.flatten(), (prob_mat, lenghts))
-        prob_mat = prob_mat.reshape(n_nodes, n_images).T
+        prob_mat = CryoBife.likelihood(path, images, sigma)
 
         # Sum here since iid images; logsumexp
         log_likelihood = np.sum(np.log(np.dot(prob_mat, weights)))
         log_prior = kappa * prior_fxn(fe_prof)
 
-        neg_log_posterior = -(log_likelihood + log_prior)
+        energy = -(log_likelihood + log_prior)
 
         # Calculate gradient
-        grad = np.zeros_like(path)
+        gradient = np.zeros_like(path)
 
         weighted_pmat = weights[:, None] * prob_mat.T / np.sum(prob_mat * weights, axis=1)
 
-        if world_size == 1:
+        gradient[:, 0] = -1 / sigma**2 * np.sum((images[:, 0] - path[:, 0][:, None]) * weighted_pmat, axis=1)
+        gradient[:, 1] = -1 / sigma**2 * np.sum((images[:, 1] - path[:, 1][:, None]) * weighted_pmat, axis=1)
 
-            grad[:, 0] = -1 / sigma**2 * np.sum((images[:, 0] - path[:, 0][:, None]) * weighted_pmat, axis=1)
-            grad[:, 1] = -1 / sigma**2 * np.sum((images[:, 1] - path[:, 1][:, None]) * weighted_pmat, axis=1)
+        gradient[0] *= 0.0
+        gradient[-1] *= 0.0
 
-            grad[0] *= 0.0
-            grad[-1] *= 0.0
-
-        else:
-            if rank == 0:
-
-                grad[1, 0] = -1 / sigma**2 * np.sum((images[:, 0] - path[1, 0]) * weighted_pmat[1, :])
-                grad[1, 1] = -1 / sigma**2 * np.sum((images[:, 1] - path[1, 1]) * weighted_pmat[1, :])
-
-            elif rank == world_size - 1:
-                grad[0, 0] = -1 / sigma**2 * np.sum((images[:, 0] - path[0, 0]) * weighted_pmat[-2, :])
-                grad[0, 1] = -1 / sigma**2 * np.sum((images[:, 1] - path[0, 1]) * weighted_pmat[-2, :])
-
-            else:
-                grad[0, 0] = -1 / sigma**2 * np.sum((images[:, 0] - path[0, 0]) * weighted_pmat[rank + 1, :])
-                grad[0, 1] = -1 / sigma**2 * np.sum((images[:, 1] - path[0, 1]) * weighted_pmat[rank + 1, :])
-
-        return neg_log_posterior, grad
+        return energy, gradient
 
     def optimizer(
-        self, path: np.ndarray, images: np.ndarray, sigma: float, mpi_params: Tuple, initial_fe_prof: np.ndarray = None
+        self, path: np.ndarray, images: np.ndarray, sigma: float, initial_fe_prof: np.ndarray = None
     ) -> np.ndarray:
         """Find the optimal free-energy profile given a path and a dataset of images
 
@@ -179,41 +145,15 @@ class CryoBife:
         :returns: Optimized free-energy profile
         """
 
-        # Setting up parallel stuff
-        rank, world_size, comm = mpi_params
-        # Setting up numbers of things
-        n_images = images.shape[0]
-
-        if world_size == 1:
-            n_nodes = path.shape[0]
-
-        else:
-            n_nodes = world_size + 2
-
         kappa = 1
 
         if initial_fe_prof is None:
 
-            initial_fe_prof = 1.0 * np.random.randn(n_nodes)
+            initial_fe_prof = 1.0 * np.random.randn(path.shape[0])
 
-        path_rank = prep_for_mpi(path, rank, world_size)
+        prob_mat = self.likelihood(path, images, sigma)
 
-        prob_mat_rank = self.likelihood(path_rank, images, sigma)
-        lenghts = np.array(comm.allgather(prob_mat_rank.size))
-
-        prob_mat = np.empty((n_images * n_nodes))
-        comm.Allgatherv(prob_mat_rank.T.flatten(), (prob_mat, lenghts))
-        prob_mat = prob_mat.reshape(n_nodes, n_images).T
-
-        if rank == 0:
-            optimized_fe_prof = so.minimize(
-                self.neg_log_posterior, initial_fe_prof, method="CG", args=(kappa, prob_mat)
-            ).x
-
-        else:
-            optimized_fe_prof = np.empty_like(initial_fe_prof)
-
-        comm.bcast(optimized_fe_prof, root=0)
+        optimized_fe_prof = so.minimize(self.energy, initial_fe_prof, method="CG", args=(kappa, prob_mat)).x
 
         return optimized_fe_prof
 
@@ -268,6 +208,6 @@ class CryoVife(object):
         negative_elbo = variational_cost + entropy
 
         # Calculate gradient with respect to nodes
-        grad = np.mean(path_image_dists, axis=0) * weights.reshape(-1, 1) / (variance)
+        gradient = np.mean(path_image_dists, axis=0) * weights.reshape(-1, 1) / (variance)
 
-        return negative_elbo, grad
+        return negative_elbo, gradient

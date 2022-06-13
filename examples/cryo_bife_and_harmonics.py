@@ -56,7 +56,7 @@ def main():
 
     # Run path optimization
     # This path has the node in the middle far away from where it's supposed to be
-    #initial_path = np.loadtxt("3_well_data/initial_path_far_mid_node") - 1
+    # initial_path = np.loadtxt("3_well_data/initial_path_far_mid_node") - 1
     initial_path = np.load("tight_path.npy")
 
     assert (world_size + 2 == initial_path.shape[0]) or (world_size == 1), "Wrong world size"

@@ -1,7 +1,6 @@
 """Provide stochastic gradient descent optimizator for path optimization with cryo-bife"""
 from typing import Callable, Tuple
 import numpy as np
-from cryo_bimep.utils import prep_for_mpi
 from cryo_bimep.string_method import run_string_method
 
 
@@ -10,7 +9,6 @@ def run_stochastic_gd_string(
     fe_prof: np.ndarray,
     grad_and_energy_func: Callable,
     grad_and_energy_args: Tuple,
-    mpi_params,
     images: np.ndarray,
     steps: float,
     step_size: float = 0.0001,
@@ -41,9 +39,6 @@ def run_stochastic_gd_string(
     :returns: Last accepted path
     """
 
-    # Set up MPI stuff
-    rank, world_size, comm = mpi_params
-
     if batch_size is None:
         batch_size = images.shape[0]
 
@@ -51,67 +46,44 @@ def run_stochastic_gd_string(
     residual_batches = images.shape[0] % batch_size
 
     sim_path = initial_path.copy()
-    if rank == 0:
-        sim_path, tangent_to_path = run_string_method(sim_path)
-
-    comm.bcast(sim_path, root=0)
-    comm.bcast(tangent_to_path, root=0)
-
-    path_rank = prep_for_mpi(sim_path, rank, world_size)
-    tang_to_path_rank = prep_for_mpi(tangent_to_path, rank, world_size)
+    sim_path, tangent_to_path = run_string_method(sim_path)
 
     images_shuffled = images.copy()
 
-    if rank == 0:
-        trajectory = []
+    trajectory = np.zeros((steps, *initial_path.shape))
 
-    for _ in range(steps):
+    for step in range(steps):
 
-        if rank == 0:
-            images_shuffled = images.copy()
-            np.random.shuffle(images_shuffled)
-
-        comm.bcast(images_shuffled, root=0)
+        images_shuffled = images.copy()
+        np.random.shuffle(images_shuffled)
 
         for i in range(number_of_batches):
 
             images_batch = images_shuffled[i * batch_size : (i + 1) * batch_size]
 
-            comm.Barrier()
-            __, grad = grad_and_energy_func(path_rank, fe_prof, images_batch, *grad_and_energy_args)
+            __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
 
-            perp_grad = [np.dot(tang_to_path_rank.T[0, :], grad[:, 0]), np.dot(tang_to_path_rank.T[1, :], grad[:, 1])] * tang_to_path_rank
+            perp_grad = [
+                np.dot(tangent_to_path.T[0, :], grad[:, 0]),
+                np.dot(tangent_to_path.T[1, :], grad[:, 1]),
+            ] * tangent_to_path
 
-            path_rank += -step_size * (grad - perp_grad)
+            sim_path -= step_size * (grad - perp_grad)
 
         if residual_batches != 0:
 
             images_batch = images_shuffled[(number_of_batches - 1) * batch_size :]
 
-            comm.Barrier()
-            __, grad = grad_and_energy_func(path_rank, fe_prof, images_batch, *grad_and_energy_args)
+            __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
 
-            perp_grad = [np.dot(tang_to_path_rank.T[0, :], grad[:, 0]), np.dot(tang_to_path_rank.T[1, :], grad[:, 1])] * tang_to_path_rank
+            perp_grad = [
+                np.dot(tangent_to_path.T[0, :], grad[:, 0]),
+                np.dot(tangent_to_path.T[1, :], grad[:, 1]),
+            ] * tangent_to_path
 
-            path_rank += -step_size * (grad - perp_grad)
+            sim_path -= step_size * (grad - perp_grad)
 
-        lenghts = np.array(comm.allgather(path_rank.size))
-        tmp_path = np.empty((initial_path.size))
+        sim_path, tangent_to_path = run_string_method(sim_path)
+        trajectory[step] = sim_path
 
-        comm.Allgatherv(path_rank, (tmp_path, lenghts))
-        sim_path = tmp_path.reshape(initial_path.shape)
-
-        if rank == 0:
-            sim_path, tangent_to_path = run_string_method(sim_path)
-            trajectory.append(sim_path)
-
-        comm.bcast(sim_path, root=0)
-        comm.bcast(tangent_to_path, root=0)
-
-        path_rank = prep_for_mpi(sim_path, rank, world_size)
-        tang_to_path_rank = prep_for_mpi(tangent_to_path, rank, world_size)
-
-    # returns last accepted path
-
-    if rank == 0:
-        return np.array(trajectory)
+    return trajectory

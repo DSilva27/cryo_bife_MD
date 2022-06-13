@@ -4,15 +4,18 @@ Can be run using pytest, e.g. `pytest test_gradient.py`.
 """
 
 import numpy as np
-#import pytest
+
+# import pytest
 from pytest_easyMPI import mpi_parallel
 from cryo_bimep.constraints import harm_rest_energy_and_grad
 from cryo_bimep.utils import prep_for_mpi
+
 
 @mpi_parallel(1)
 def test_harm_rest_gradient_serial():
 
     from mpi4py import MPI
+
     "Test numerically harmonic restrain gradient"
 
     comm = MPI.COMM_WORLD
@@ -32,9 +35,7 @@ def test_harm_rest_gradient_serial():
 
     test_path_rank = prep_for_mpi(test_path, rank, world_size)
 
-    ref_energy, _ = harm_rest_energy_and_grad(
-        test_path_rank, test_ref_path, kappa, mpi_params
-    )
+    ref_energy, _ = harm_rest_energy_and_grad(test_path_rank, test_ref_path, kappa, mpi_params)
 
     num_grad = np.zeros_like(test_path)
     an_grad = np.zeros_like(test_path)
@@ -49,17 +50,17 @@ def test_harm_rest_gradient_serial():
             pert_path_rank = prep_for_mpi(pert_path, rank, world_size)
 
             comm.Barrier()
-            pert_energy, pert_grad = harm_rest_energy_and_grad(
-                pert_path_rank, test_ref_path, kappa, mpi_params
-            )
+            pert_energy, pert_grad = harm_rest_energy_and_grad(pert_path_rank, test_ref_path, kappa, mpi_params)
 
             num_grad[i, j] = (pert_energy - ref_energy) / eps
             an_grad[i, j] = pert_grad[i, j]
 
     assert np.allclose(num_grad, an_grad)
 
+
 def main():
 
     test_harm_rest_gradient_serial()
+
 
 main()
