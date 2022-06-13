@@ -14,7 +14,7 @@ def harm_rest_energy_and_grad(path: np.ndarray, ref_path: np.array, kappa: float
     :returns: harmonic distance constraint energy and gradient
     """
 
-    energy = 0.5 * kappa * np.sum(np.sum((path - ref_path)** 2, axis=1))
+    energy = 0.5 * kappa * np.sum(np.sum((path - ref_path) ** 2, axis=1))
     gradient = kappa * (path - ref_path)
 
     return energy, gradient

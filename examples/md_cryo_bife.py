@@ -65,7 +65,16 @@ fe_prof = cryo_bife_obj.optimizer(restrained_path, images, cb_sigma)
 
 cb_grad_energy_args = (0.5, 1, 1)
 
-optimized_traj = stochastic_gd.run_stochastic_gd(restrained_path, fe_prof, CryoBife.grad_and_energy, cb_grad_energy_args, images, steps=1, step_size=0.0001, batch_size=int(images.shape[0] * 0.1))
+optimized_traj = stochastic_gd.run_stochastic_gd(
+    restrained_path,
+    fe_prof,
+    CryoBife.grad_and_energy,
+    cb_grad_energy_args,
+    images,
+    steps=1,
+    step_size=0.0001,
+    batch_size=int(images.shape[0] * 0.1),
+)
 
 optimized_path = optimized_traj[-1]
 
@@ -74,10 +83,7 @@ plt.plot(optimized_path[:, 0], optimized_path[:, 1], ls="--", marker="o", label=
 plt.legend()
 plt.show()
 
-#euler_maruyama.run_euler_maruyama(, harm_rest_energy_and_grad, )
+# euler_maruyama.run_euler_maruyama(, harm_rest_energy_and_grad, )
 
 
-#fe_prof = cryo_bife_obj.optimizer(new_path, images, cb_sigma)
-
-
-
+# fe_prof = cryo_bife_obj.optimizer(new_path, images, cb_sigma)
