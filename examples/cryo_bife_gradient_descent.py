@@ -8,21 +8,6 @@ from cryo_bimep.utils import animate_simulation
 
 from cryo_bimep.constraints.harm_restrain import harm_rest_energy_and_grad
 
-"""
-1. Unbiased MD (swarms = 1)
-2. Reparametrize with string method -> new path (or new nodes)
-3. Restrained MD using the new path (move atomic structures to the new nodes)
-4. Optimize the path using cryo-bife (using the cryo-em images)  (gradient descent or something)
-5. Reparametrize again
-6. restrained again
-
-Repeat
-
-1 -> 4 -> 5 -> 6 (repeat 4-6 if necessary)
-
-H(x, y)
-"""
-
 
 cryo_bife_obj = CryoBife()
 
