@@ -197,7 +197,7 @@ class CryoBife:
 
 
 images = np.loadtxt('/home/jgiraldob/Files_for_David_test/Cryo-CV/2-wells_images.txt')
-ini_path = np.loadtxt('/home/jgiraldob/example_data/2-wels_Orange-path')
+ini_path = np.loadtxt('/home/jgiraldob/example_data/2-wells_Orange-path')
 first_path = np.copy(ini_path)
 sim_path = np.copy(ini_path)
 
