@@ -56,4 +56,10 @@ def run_string_method(path):
 
     new_path = path_string[new_nodes]
 
-    return new_path
+    path_string_der = np.array([cspline1(x_eval_spline, 1), cspline2(x_eval_spline, 1)]).T
+
+    tangent_to_new_path = np.zeros_like(new_path)
+    tangent_to_new_path[1:-1] = path_string_der[new_nodes[1:-1]]
+    tangent_to_new_path /= np.linalg.norm(tangent_to_new_path)
+
+    return new_path, tangent_to_new_path
