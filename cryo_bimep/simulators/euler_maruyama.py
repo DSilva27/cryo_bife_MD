@@ -1,15 +1,12 @@
 """Provide Langevin simulator for path optimization with cryo-bife"""
 from typing import Callable, Tuple
 import numpy as np
-from cryo_bimep.utils import prep_for_mpi
 
 
 def run_euler_maruyama(
     initial_path: np.ndarray,
-    fe_prof: np.ndarray,
     grad_and_energy_func: Callable,
     grad_and_energy_args: Tuple,
-    mpi_params,
     steps: float,
     step_size: float = 0.0001,
 ) -> np.ndarray:
@@ -27,27 +24,18 @@ def run_euler_maruyama(
 
     :returns: Last accepted path
     """
-    # Set up MPI stuff
-    rank, world_size, comm = mpi_params
 
     # Calculate "old" variables
     sim_path = initial_path.copy()
-    path_rank = prep_for_mpi(sim_path, rank, world_size)
+    trajectory = np.zeros((steps, *initial_path.shape))
 
-    for _ in range(steps):
-
-        # # Selecting which replica to update
-        # path_index = [np.random.randint(0, initial_path.shape[0]), np.random.randint(0, 2)]
-        # while path_index[0] in (0, 7, 13):
-        #     path_index[0] = np.random.randint(0, initial_path.shape[0])
-
-        # # Select which coordinate to update
-        # path_index = tuple(path_index)
+    for step in range(steps):
 
         # Calculate new proposal
-        comm.Barrier()
-        __, grad = grad_and_energy_func(sim_path, fe_prof, *grad_and_energy_args)
-        path_rank += -step_size * grad + np.sqrt(2 * step_size) * np.random.randn()
+        __, grad = grad_and_energy_func(sim_path, *grad_and_energy_args)
+        sim_path += -step_size * grad + np.sqrt(2 * step_size) * np.random.randn()
+
+        trajectory[step] = sim_path
 
     # returns last accepted path
-    return sim_path
+    return trajectory

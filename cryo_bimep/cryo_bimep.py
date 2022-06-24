@@ -6,6 +6,8 @@ from tqdm import tqdm
 from cryo_bimep.cryo_bife import CryoBife
 from cryo_bimep.string_method import run_string_method
 
+from cryo_bimep.simulators import brownian_motion
+
 
 class CryoBimep(CryoBife):
     """CryoBimep provides the methodology to optimize a path using
@@ -35,41 +37,38 @@ class CryoBimep(CryoBife):
         self._grad_and_energy_func = grad_and_energy_func
         self._grad_and_energy_args = args
 
-    def path_optimization(self, initial_path, images, steps, mpi_params, paths_fname=None):
-
-        rank, world_size, comm = mpi_params
+    def path_optimization(self, initial_path, images, steps, paths_fname=None):
 
         sigma = 0.5
-        paths = np.zeros((steps + 1, *initial_path.shape))
-        paths[0] = initial_path
+
+        trajectory = np.zeros(((steps + 1) * 100, *initial_path.shape))
+        trajectory[0] = initial_path
 
         curr_path = initial_path.copy()
 
         for i in tqdm(range(steps)):
 
-            fe_prof = self.optimizer(curr_path, images, sigma, mpi_params)
-            # fe_prof = np.random.randn(curr_path.shape[0])
+            fe_prof = self.optimizer(curr_path, images, sigma)
+
             curr_path = self._simulator(
                 curr_path, fe_prof, self._grad_and_energy_func, self._grad_and_energy_args, *self._sim_args
             )
 
-            if rank == 0:
-                curr_path = run_string_method(curr_path)
+            trajectory[100 * i + 1 : 100 * (i + 1) + 1] = curr_path
 
-            comm.bcast(curr_path, root=0)
-
-            paths[i + 1] = curr_path
-
-        if paths_fname is not None and rank == 0:
+        if paths_fname is not None:
 
             if ".txt" in paths_fname:
-                np.savetxt(f"{paths_fname}", paths)
+                np.savetxt(f"{paths_fname}", trajectory)
 
             elif ".npy" in paths_fname:
-                np.save(f"{paths_fname}", paths)
+                np.save(f"{paths_fname}", trajectory)
 
             else:
                 print("Unknown file extension, saving as npy instead")
-                np.save(f"{paths_fname.partition('.')[0]}.npy", paths)
+                np.save(f"{paths_fname.partition('.')[0]}.npy", trajectory)
 
-        return paths
+        return trajectory
+
+
+#    def run_restrained_md(self, initial_path):
