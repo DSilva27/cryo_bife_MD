@@ -4,16 +4,11 @@ import scipy.optimize as so
 import matplotlib.pyplot as plt
 from typing import Callable, Tuple
 
-
-from numba import jit, njit
-
-
 class CryoBife:
     """CryoBife provides cryo-bife's prior, likelihood, posterior and
     the optimizer as described in 10.1038/s41598-021-92621-1. """
 
     @staticmethod
-    @jit
     def integrated_prior(fe_prof: np.ndarray) -> float:
         """Calculate the value of the prior for the given free-energy profile.
 
@@ -28,7 +23,6 @@ class CryoBife:
         return log_prior
 
     @staticmethod
-    @jit
     def likelihood(
             path: np.ndarray,
             images: np.ndarray,
@@ -151,8 +145,7 @@ class CryoBife:
 
             gradx = gradx/Norm
             grady= grady/Norm
-            #print('SHAPE_GRADX',gradx.shape)
-
+            
             grad[k,0] = np.sum(gradx) 
             grad[k,1] = np.sum(grady) 
             
