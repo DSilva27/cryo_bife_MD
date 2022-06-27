@@ -37,8 +37,6 @@ def _calc_energy_and_grad_non_vectorized(path, path_samples, fe_prof, images):
     path_cvs = _calc_cv(path)
     traj_cvs = _calc_cv(path_samples)
 
-    gradient = np.zeros_like(path_cvs)
-
     diff_cvs = traj_cvs - path_cvs[:, np.newaxis, :]
 
     # !TODO set up cryo-bf sigma
@@ -46,7 +44,23 @@ def _calc_energy_and_grad_non_vectorized(path, path_samples, fe_prof, images):
 
     nu = 1
     weights = np.exp(-fe_prof)
+    
+    # ENERGY 
+    log_posterior = 0.0
+    for i in range(images.shape[0]):
+        tmp_sum = 0.0
+        for j in range(path.shape[0]):
 
+            mean1 = np.mean(prob_mat[j, :, i])
+            denominator = np.sum(weights)
+
+            tmp_sum += mean1 * weights[j] / denominator
+
+        log_posterior += np.log(tmp_sum)
+        
+    # GRADIENT
+    gradient = np.zeros_like(path_cvs)
+        
     for i in range(path_cvs.shape[0]):  # sobre los nodos
         for j in range(path_cvs.shape[1]):  # sobre las dimensiones (0, 1)
             for k in range(images.shape[0]):  # sobre las imágenes
@@ -61,19 +75,7 @@ def _calc_energy_and_grad_non_vectorized(path, path_samples, fe_prof, images):
                     2 * nu * weights[i] * (mean1 - mean2 * mean3) / denominator
                 )
 
-    energy = 0.0
-    for i in range(images.shape[0]):
-        tmp_sum = 0.0
-        for j in range(path.shape[0]):
-
-            mean1 = np.mean(prob_mat[j, :, i])
-            denominator = np.sum(weights)
-
-            tmp_sum += mean1 * weights[j] / denominator
-
-        energy += np.log(tmp_sum)
-
-    return -energy, -gradient
+    return -log_posterior, -gradient
 
 
 def calc_energy_and_grad(path, trajectories, fe_prof, images, spring_constant):
