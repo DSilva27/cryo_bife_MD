@@ -5,21 +5,15 @@ import matplotlib.pyplot as plt
 from typing import Callable, Tuple
 
 
-from numba import jit, njit
-
-
 class CryoBife:
     """CryoBife provides cryo-bife's prior, likelihood, posterior and
     the optimizer as described in 10.1038/s41598-021-92621-1."""
 
     @staticmethod
-    @jit
     def integrated_prior(fe_prof: np.ndarray) -> float:
         """Calculate the value of the prior for the given free-energy profile.
-
         :param fe_prof: Array with the values of the free-energy profile in each
             node of the path.
-
         :returns: The value of the prior for the free-energy profile.
         """
         acc_der_fe_prof = sum(np.diff(fe_prof) ** 2)
@@ -28,21 +22,26 @@ class CryoBife:
         return log_prior
 
     @staticmethod
-    @jit
     def likelihood(
         path: np.ndarray, images: np.ndarray, Sample_per_nodes: np.ndarray, sigma: float
     ) -> np.ndarray:
         """Calculate cryo-bife's likelihood matrix given a path and a dataset of images
-
         :param path: Array with the values of the variables at each node of the path.
                      Shape must be (n_models, n_dimensions).
         :param images: Array with all the experimental images.
                        Shape must be (n_images, image_dimensions)
         :param sigma: Overall noise among the images
-
         :returns: Array with the likelihood of observing each image given each model.
                   Shape will be (n_images, n_models)
         """
+
+        #        number_of_nodes = path.shape[0]
+        #        number_of_images = images.shape[0]
+        #        prob_matrix = np.zeros((number_of_images, number_of_nodes))
+
+        #        norm = 1 / (2 * np.pi * sigma**2)
+        #        prob_matrix = norm * np.exp(-0.5 * 1/sigma**2 *\
+        #                                    np.sum((path[:,None] - images)**2, axis=-1)).T
 
         norm = 1 / (2 * np.pi * sigma**2)
         number_of_images = images.shape[0]
@@ -61,6 +60,12 @@ class CryoBife:
                     )
                 )
 
+        #        for i in range(number_of_nodes):
+        #            for j in range(number_of_samples):
+        #                for k in range(number_of_images):
+        #
+        #                    prob_matrix[i,j,k] = norm * np.exp(-0.5 * 1/sigma**2 *\
+        #                                                       np.sum((Sample_per_nodes[i,j,:] - images[k,:])**2)).T
         return prob_matrix
 
     def neg_log_posterior(
@@ -72,13 +77,11 @@ class CryoBife:
         prior_fxn: Callable = None,
     ) -> float:
         """Calculate cryo-bife's negative log-posterior.
-
         :param fe_prof: Array with the values of the free-energy profile (FEP)
                         in each node of the path.
         :param beta: Temperature.
         :param kappa: Scaling factor for the prior.
         :prior_fxn: Function used to calculate the FEP's prior
-
         :returns: Value of the negative log-posterior
         """
 
@@ -110,7 +113,6 @@ class CryoBife:
         prior_fxn: Callable = None,
     ) -> np.ndarray:
         """Calculate cryo-bife's negative log-posterior.
-
         :param path: Array with the values of the variables at each node of the path.
                      Shape must be (n_models, n_dimensions).
         :param fe_prof: Array with the values of the free-energy profile (FEP)
@@ -121,7 +123,6 @@ class CryoBife:
         :param beta: Temperature.
         :param kappa: Scaling factor for the prior.
         :prior_fxn: Function used to calculate the FEP's prior
-
         :returns: Value of the negative log-posterior
         """
         G = fe_prof
@@ -160,7 +161,6 @@ class CryoBife:
 
             gradx = gradx / Norm
             grady = grady / Norm
-            # print('SHAPE_GRADX',gradx.shape)
 
             grad[k, 0] = np.sum(gradx)
             grad[k, 1] = np.sum(grady)
@@ -176,14 +176,12 @@ class CryoBife:
         initial_fe_prof: np.ndarray = None,
     ) -> np.ndarray:
         """Find the optimal free-energy profile given a path and a dataset of images
-
         :param path: Array with the values of the variables at each node of the path.
                      Shape must be (n_models, n_dimensions).
         :param images: Array with all the experimental images.
                        Shape must be (n_images, image_dimensions)
         :param sigma: TODO.
         :param fe_prof: Initial guess for the free-energy profile
-
         :returns: Optimized free-energy profile
         """
 
