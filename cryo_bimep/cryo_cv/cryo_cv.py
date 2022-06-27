@@ -73,7 +73,7 @@ def _calc_energy_and_grad_non_vectorized(path, path_samples, fe_prof, images):
 
         energy += np.log(tmp_sum)
 
-    return energy, gradient
+    return -energy, -gradient
 
 
 def calc_energy_and_grad(path, trajectories, fe_prof, images, spring_constant):
