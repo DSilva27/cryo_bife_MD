@@ -3,19 +3,17 @@ from typing import Callable, Tuple
 import numpy as np
 from tqdm import tqdm
 
-from cryo_bimep.cryo_bife import CryoBife
+from cryo_bimep.cryo_bife import optimize_free_energy
 from cryo_bimep.string_method import run_string_method
 
 from cryo_bimep.simulators import brownian_motion
 
 
-class CryoBimep(CryoBife):
+class CryoBimep:
     """CryoBimep provides the methodology to optimize a path using
     a simulator and cryo-bife iteratively."""
 
     def __init__(self):
-        """Constructor. Initializes cryo-bife object."""
-        CryoBife.__init__(self)
 
         self._simulator = None
         self._sim_args = None
@@ -48,10 +46,14 @@ class CryoBimep(CryoBife):
 
         for i in tqdm(range(steps)):
 
-            fe_prof = self.optimizer(curr_path, images, sigma)
+            fe_prof = optimize_free_energy(curr_path, images, sigma)
 
             curr_path = self._simulator(
-                curr_path, fe_prof, self._grad_and_energy_func, self._grad_and_energy_args, *self._sim_args
+                curr_path,
+                fe_prof,
+                self._grad_and_energy_func,
+                self._grad_and_energy_args,
+                *self._sim_args,
             )
 
             trajectory[100 * i + 1 : 100 * (i + 1) + 1] = curr_path

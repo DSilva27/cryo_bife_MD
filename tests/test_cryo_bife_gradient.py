@@ -11,18 +11,11 @@ from cryo_bimep.cryo_bife import CryoBife
 from cryo_bimep.utils import prep_for_mpi
 
 
-@mpi_parallel(1)
 def test_cryo_bife_grad():
 
     from mpi4py import MPI
 
     "Test numerically cryo-bife's gradient"
-
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    world_size = comm.Get_size()
-
-    mpi_params = (rank, world_size, comm)
 
     N_PIXELS = 32
     PIXEL_SIZE = 0.5
@@ -37,24 +30,19 @@ def test_cryo_bife_grad():
     cb_kappa = 1
 
     # Create random path, images, and free-energy profile
-    test_path = np.random.randn(world_size + 2, 2)
+    n_nodes = 10
+
+    test_path = np.random.randn(n_nodes, 2)
     test_images = np.random.randn(100, N_PIXELS, N_PIXELS)
-    test_fe = np.random.randn(world_size + 2)
-
-    assert (
-        4 < test_path.shape[0]
-    ), "Too few nodes for test, use at least 5 (3 MPI ranks)"
-
-    test_path_rank = prep_for_mpi(test_path, rank, world_size)
+    test_fe = np.random.randn(n_nodes)
 
     ref_energy, _ = CryoBife.grad_and_energy(
-        test_path_rank,
+        test_path,
         test_fe,
         test_images,
         img_params,
         cb_sigma,
         cb_kappa,
-        mpi_params,
         cb_beta,
     )
 
@@ -68,17 +56,13 @@ def test_cryo_bife_grad():
             pert_path = test_path.copy()
             pert_path[i, j] += eps
 
-            pert_path_rank = prep_for_mpi(pert_path, rank, world_size)
-
-            comm.Barrier()
             pert_energy, pert_grad = CryoBife.grad_and_energy(
-                pert_path_rank,
+                pert_path,
                 test_fe,
                 test_images,
                 img_params,
                 cb_sigma,
                 cb_kappa,
-                mpi_params,
                 cb_beta,
             )
 

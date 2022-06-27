@@ -3,7 +3,9 @@ from typing import Tuple
 import numpy as np
 
 
-def harm_rest_energy_and_grad(path: np.ndarray, ref_path: np.array, kappa: float) -> Tuple[float, np.ndarray]:
+def harm_rest_energy_and_grad(
+    path: np.ndarray, ref_path: np.array, kappa: float
+) -> Tuple[float, np.ndarray]:
     """Calculate harmonic distance constraint energy and grad for a path when compared to a reference path.
 
     :param path: Array with the initial values of the free-energy profile in each

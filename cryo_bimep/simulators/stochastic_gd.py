@@ -59,14 +59,18 @@ def run_stochastic_gd(
 
             images_batch = images_shuffled[i * batch_size : (i + 1) * batch_size]
 
-            __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
+            __, grad = grad_and_energy_func(
+                sim_path, fe_prof, images_batch, *grad_and_energy_args
+            )
             sim_path += -step_size * grad
 
         if residual_batches != 0:
 
             images_batch = images_shuffled[(number_of_batches - 1) * batch_size :]
 
-            __, grad = grad_and_energy_func(sim_path, fe_prof, images_batch, *grad_and_energy_args)
+            __, grad = grad_and_energy_func(
+                sim_path, fe_prof, images_batch, *grad_and_energy_args
+            )
             sim_path += -step_size * grad
 
         trajectory[step] = sim_path

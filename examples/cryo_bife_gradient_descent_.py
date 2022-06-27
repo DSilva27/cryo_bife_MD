@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 
 from cryo_bimep.simulators import brownian_motion, euler_maruyama, stochastic_gd
 from cryo_bimep.string_method import string_method
-from cryo_bimep.cryo_bife import CryoBife
+from cryo_bimep.cryo_bife import optimize_free_energy
+from cryo_bimep.cryo_bife import calc_grad_and_energy as cryo_bife_energy_and_grad
 from cryo_bimep.utils import animate_simulation
 
 from cryo_bimep.constraints.harm_restrain import harm_rest_energy_and_grad
@@ -22,9 +23,6 @@ Repeat
 
 H(x, y)
 """
-
-
-cryo_bife_obj = CryoBife()
 
 initial_path = np.loadtxt("3_well_data/initial_path_far_mid_node") - 1
 images = np.loadtxt("3_well_data/images.txt")
@@ -45,11 +43,11 @@ all_fe_prof = np.zeros((opt_steps, initial_path.shape[0]))
 
 for j in range(opt_steps):
 
-    fe_prof = cryo_bife_obj.optimizer(current_path, images, cb_sigma, fe_prof)
+    fe_prof = optimize_free_energy(current_path, images, cb_sigma, fe_prof)
     optimized_traj = stochastic_gd.run_stochastic_gd(
         current_path,
         fe_prof,
-        CryoBife.grad_and_energy,
+        cryo_bife_energy_and_grad,
         cb_grad_energy_args,
         images,
         steps=gd_steps,
@@ -59,6 +57,7 @@ for j in range(opt_steps):
     current_path = optimized_traj[-1]
     full_traj[j * gd_steps : (j + 1) * gd_steps] = optimized_traj
     all_fe_prof[j] = fe_prof
+
 np.save("Full_traj.npy", full_traj)
 np.save("All_fe_prof.npy", all_fe_prof)
 
